@@ -1,0 +1,7 @@
+#!/usr/bin/env python3
+
+import sys
+
+from aws_eden_cli.cmdline import main
+
+sys.exit(main(sys.argv[1:]))
