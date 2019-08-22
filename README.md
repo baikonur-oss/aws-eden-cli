@@ -19,24 +19,26 @@ Works only with Python 3.6+.
 1. Config JSON file in a S3 bucket with structure described below
 2. A reference ECS Service with Target Group Attached
 3. An ALB with HTTPS Listener
-    - will be reused by all environments with Host Header Listener Rules
+    - Will be reused by all environments with Host Header Listener Rules
+    - Separate from what reference service uses
+    - Listener must have wildcard certificate for target dynamic zone
 4. Simple ALB usage
-    - no multiple path rules etc.
-    - one ALB per one ECS Service
+    - No multiple path rules etc.
+    - One ALB per one ECS Service
 
 ## What it does
 ### Resources created/deleted
 eden creates
 1. ECS Task Definition 
-    -  cloned from reference service
+    -  Cloned from reference service
 2. ALB (elbv2) Target Group 
-    - settings cloned from Target Group attached to reference service
+    - Settings cloned from Target Group attached to reference service
 3. ECS Service
-    - created in the same cluster as reference service
+    - Created in the same cluster as reference service
 4. ALB Listener Rule
     - Host Header rule
 5. Route 53 CNAME record
-    - points to common ALB
+    - Points at common ALB
 6. An entry is added to config JSON file
 
 eden deletes resources as in list above but in reverse order.
