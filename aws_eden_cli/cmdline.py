@@ -123,8 +123,6 @@ def check_profile(config, profile):
         logger.debug("Skipping ConfigParser DEFAULT profile (comes up even if not in file)")
         return 0
 
-    logger.info(parameters)
-
     if profile not in config:
         logger.error(f"Profile {profile} is not in config file")
         errors += 1
