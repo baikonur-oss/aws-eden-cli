@@ -9,7 +9,7 @@ requirements = [
 
 setup(
     name='aws_eden_cli',
-    version='v0.1.3',
+    version='v0.1.4',
     license='MIT',
     author='Tamirlan Torgayev',
     author_email='torgayev@me.com',
