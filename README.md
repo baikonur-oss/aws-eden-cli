@@ -1,8 +1,8 @@
 # aws-eden-cli: ECS Dynamic Environment Manager [![PyPi version](https://img.shields.io/pypi/v/aws-eden-cli.svg)](https://pypi.python.org/pypi/aws-eden-cli/) ![](https://img.shields.io/badge/python-3.6+-blue.svg) ![t](https://img.shields.io/badge/status-beta-orange.svg) 
 
 
-Clone ECS environments easily. 
-Provide eden with a sample ECS service and eden will clone it. 
+Clone Amazon ECS environments easily. 
+Provide eden with a Amazon ECS service and eden will clone it. 
 
 eden is provided in CLI and Terraform module (Lambda with HTTP API) flavors. 
 You can use HTTP API from CI of your choice on Pull Request open/close, 
@@ -41,7 +41,7 @@ eden creates
     - Points at common ALB
 6. An entry is added to config JSON file
 
-eden deletes resources as in list above but in reverse order.
+eden deletes resources in reverse order.
 
 ### Config JSON file
 Config file is used to:

@@ -1,4 +1,4 @@
-from eden_core import validators
+from aws_eden_core import validators
 
 parameters = [
     {
