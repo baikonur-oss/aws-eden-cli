@@ -3,6 +3,7 @@ import configparser
 import logging
 import os
 import sys
+from pathlib import Path
 
 from . import consts
 import aws_eden_core.methods as function
@@ -61,6 +62,12 @@ def command_config(args: dict):
         os.makedirs(path)
 
     path = os.path.expanduser(args['config_path'])
+
+    config_file = Path(path)
+    if not config_file.is_file():
+        logger.info(f"Config file {path} is empty")
+        return
+
     config = read_config(path)
 
     updated = False
@@ -116,6 +123,13 @@ def check_profile(config, profile):
         logger.debug("Skipping ConfigParser DEFAULT profile (comes up even if not in file)")
         return 0
 
+    logger.info(parameters)
+
+    if profile not in config:
+        logger.error(f"Profile {profile} is not in config file")
+        errors += 1
+        return errors
+
     for parameter in parameters:
         key = parameter['name']
 
@@ -145,10 +159,6 @@ def command_create(args: dict, event: dict):
     path = os.path.expanduser(args['config_path'])
     config = read_config(path)
 
-    errors = check_profile(config, args['profile'])
-    if errors != 0:
-        exit(-1)
-
     variables = create_envvar_dict(args, config)
     function.create_env(event['branch'], event['image_uri'], variables)
 
@@ -161,10 +171,6 @@ def command_delete(args: dict, event: dict):
     path = os.path.expanduser(args['config_path'])
     config = read_config(path)
 
-    errors = check_profile(config, args['profile'])
-    if errors != 0:
-        exit(-1)
-
     variables = create_envvar_dict(args, config)
     function.delete_env(event['branch'], variables)
 
@@ -172,19 +178,20 @@ def command_delete(args: dict, event: dict):
 def create_envvar_dict(args, config):
     variables = {}
     profile_name = args['profile']
-    for p in parameters:
-        parameter_name = p['name']
-        if parameter_name in config[profile_name]:
-            variables[p['envvar_name']] = config[profile_name][parameter_name]
-        else:
-            logger.error(f"Necessary parameter {parameter_name} not found in profile {profile_name}")
-            exit(-1)
 
     for p in parameters:
         parameter_name = p['name']
+
         if parameter_name in args:
             if args[parameter_name] is not None:
                 variables[p['envvar_name']] = args[parameter_name]
+                continue
+        if profile_name not in config or parameter_name not in config[profile_name]:
+            logger.error(f"Necessary parameter {parameter_name} not found in profile {profile_name} "
+                         f"and is not provided as an argument")
+            exit(-1)
+        else:
+            variables[p['envvar_name']] = config[profile_name][parameter_name]
 
     return variables
 
