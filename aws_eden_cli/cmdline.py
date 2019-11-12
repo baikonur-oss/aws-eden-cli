@@ -199,7 +199,7 @@ def command_config(args: dict):
                 response = dynamodb.describe_table(TableName=table_name)
                 table_status = response['Table']['TableStatus']
 
-        table = boto3.resource('dynamodb').Table('eden')
+        table = boto3.resource('dynamodb').Table(table_name)
         table.put_item(
             Item={
                 'env_name': f"_profile_{profile_name}",
