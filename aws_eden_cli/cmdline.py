@@ -104,7 +104,6 @@ def command_config_setup(args: dict):
 
 def command_config_check(args):
     setup_logging(args['verbose'])
-    profile_name = args['profile']
     config = utils.parse_config(args)
     if config is None:
         return
@@ -178,7 +177,6 @@ def command_config_remote_delete(args):
 
 def command_create(args: dict, name, image_uri):
     setup_logging(args['verbose'])
-    profile_name = args['profile']
     config = utils.parse_config(args)
     if config is None:
         return
@@ -190,7 +188,6 @@ def command_create(args: dict, name, image_uri):
 
 def command_delete(args: dict, name):
     setup_logging(args['verbose'])
-    profile_name = args['profile']
     config = utils.parse_config(args)
     if config is None:
         return
