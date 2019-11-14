@@ -50,7 +50,7 @@ def create_parser():
     parser_config_push.set_defaults(handler=command_config_push)
 
     # eden config remote_remove
-    parser_config_remote_delete = config_subparsers.add_parser('remote_remove',
+    parser_config_remote_delete = config_subparsers.add_parser('remote-remove',
                                                                help='Remove remote profile from DynamoDB')
     parser_config_remote_delete.set_defaults(handler=command_config_remote_delete)
 
