@@ -14,6 +14,9 @@ from botocore.exceptions import ClientError
 from . import consts
 import aws_eden_core.methods as function
 
+dynamodb_client = boto3.client('dynamodb')
+dynamodb_resource = boto3.resource('dynamodb')
+
 parameters = consts.parameters
 logger = logging.getLogger()
 
@@ -70,19 +73,15 @@ def create_parser():
 
 
 def command_config(args: dict):
-    dynamodb_client = boto3.client('dynamodb')
-    dynamodb_resource = boto3.resource('dynamodb')
-
     table_name = args['remote_table_name']
     table = dynamodb_resource.Table(table_name)
 
-    path = os.path.expanduser('~/.eden')
-    if not os.path.exists(path):
-        os.makedirs(path)
+    default_config_path = os.path.expanduser('~/.eden')
+    if not os.path.exists(default_config_path):
+        os.makedirs(default_config_path)
 
-    path = os.path.expanduser(args['config_path'])
-
-    config_file = Path(path)
+    config_file_path = os.path.expanduser(args['config_path'])
+    config_file = Path(config_file_path)
     if not config_file.is_file():
         logger.info(f"Config file {path} is empty")
         return
@@ -119,62 +118,73 @@ def command_config(args: dict):
             return
 
     if args['check']:
-        path = os.path.expanduser('~/.eden')
-        if not os.path.exists(path):
-            logger.error(f"Path ~/.eden does not exist")
-            exit(-1)
-
-        path = os.path.expanduser(args['config_path'])
-        config = read_config(path)
-
-        errors = 0
-        for profile in config:
-            errors += check_profile(config, profile)
-
-        if errors == 0:
-            logger.info("No errors found")
-        else:
-            logger.info(f"Found {errors} errors")
+        command_config_check(config)
 
     elif args['push']:
-        status = check_remote_state_table(dynamodb_client, table_name)
-
-        if not status:
-            return
-
-        try:
-            table.put_item(
-                Item={
-                    'env_name': f"_profile_{profile_name}",
-                    'profile':  json.dumps(create_envvar_dict(args, config))
-                }
-            )
-        except Exception as e:
-            if hasattr(e, 'response') and 'Error' in e.response:
-                logger.error(e.response['Error']['Message'])
-                return
-            else:
-                logger.error(f"Unknown exception raised: {e}")
-                return
-
-        logger.info(f"Successfully pushed profile {profile_name} to DynamoDB table {table_name}")
+        command_config_push(args, config)
 
     elif args['remote_delete']:
-        try:
-            table.delete_item(
-                Key={
-                    'env_name': f"_profile_{profile_name}",
-                },
-            )
-        except Exception as e:
-            if hasattr(e, 'response') and 'Error' in e.response:
-                logger.error(e.response['Error']['Message'])
-                return
-            else:
-                logger.error(f"Unknown exception raised: {e}")
-                return
+        command_config_remote_delete(args)
 
-        logger.info(f"Successfully removed profile {profile_name} from DynamoDB table {table_name}")
+
+def command_config_check(config):
+    errors = 0
+    for profile in config:
+        errors += check_profile(config, profile)
+    if errors == 0:
+        logger.info("No errors found")
+    else:
+        logger.info(f"Found {errors} errors")
+
+
+def command_config_push(args, config):
+    profile_name = args['profile']
+    table_name = args['remote_table_name']
+    table = dynamodb_resource.Table(table_name)
+
+    status = check_remote_state_table(dynamodb_client, table_name)
+
+    if not status:
+        return
+
+    try:
+        table.put_item(
+            Item={
+                'env_name': f"_profile_{profile_name}",
+                'profile':  json.dumps(create_envvar_dict(args, config))
+            }
+        )
+    except Exception as e:
+        if hasattr(e, 'response') and 'Error' in e.response:
+            logger.error(e.response['Error']['Message'])
+            return
+        else:
+            logger.error(f"Unknown exception raised: {e}")
+            return
+
+    logger.info(f"Successfully pushed profile {profile_name} to DynamoDB table {table_name}")
+
+
+def command_config_remote_delete(args):
+    profile_name = args['profile']
+    table_name = args['remote_table_name']
+    table = dynamodb_resource.Table(table_name)
+
+    try:
+        table.delete_item(
+            Key={
+                'env_name': f"_profile_{profile_name}",
+            },
+        )
+    except Exception as e:
+        if hasattr(e, 'response') and 'Error' in e.response:
+            logger.error(e.response['Error']['Message'])
+            return
+        else:
+            logger.error(f"Unknown exception raised: {e}")
+            return
+
+    logger.info(f"Successfully removed profile {profile_name} from DynamoDB table {table_name}")
 
 
 def check_remote_state_table(dynamodb, table_name):
