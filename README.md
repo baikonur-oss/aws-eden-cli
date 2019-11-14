@@ -145,6 +145,17 @@ No errors found
 
 $ eden config --check -p default
 No errors found
+
+# we can push profiles to DynamoDB for use by eden API
+# if eden table does not exist, eden cli will create it
+$ eden config --push -p default
+Waiting for table creation...
+Successfully pushed profile default to DynamoDB
+
+# use the same command to overwrite existing profiles
+$ eden config --push -p default
+Successfully pushed profile default to DynamoDB
+
 ```
 
 ### Execute commands

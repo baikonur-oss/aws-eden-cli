@@ -1,9 +1,15 @@
 import argparse
 import configparser
+import json
 import logging
 import os
 import sys
+import time
 from pathlib import Path
+
+import boto3
+import botocore
+from botocore.exceptions import ClientError
 
 from . import consts
 import aws_eden_core.methods as function
@@ -19,14 +25,19 @@ def read_config(path):
 
 
 def create_parser():
-    parser = argparse.ArgumentParser(description='ECS Dynamic environment manager. '
-                                                 'Clone ecs environments easily.')
+    parser = argparse.ArgumentParser(description='ECS Dynamic Environment Manager. '
+                                                 'Clone Amazon ECS environments easily.')
 
     subparsers = parser.add_subparsers()
 
     parser_config = subparsers.add_parser('config', help='Configure eden')
     parser_config.set_defaults(handler=command_config)
-    parser_config.add_argument('--check', action='store_true', help='Check configuration file integrity')
+    parser_config.add_argument('--check', action='store_true',
+                               help='Check configuration file integrity')
+    parser_config.add_argument('--push', action='store_true',
+                               help='Push local profile to DynamoDB for use by eden API')
+    parser_config.add_argument('--remote-table-name', type=str, required=False, default='eden',
+                               help='profile name in eden configuration file')
 
     parser_create = subparsers.add_parser('create', help='Create environment or deploy to existent')
     parser_create.set_defaults(handler=command_create)
@@ -95,7 +106,7 @@ def command_config(args: dict):
         with open(path, 'w') as configfile:
             config.write(configfile)
     else:
-        if not args['check']:
+        if not args['check'] and not args['push']:
             logger.error("No parameters to update were given, exiting")
 
     if args['check']:
@@ -115,6 +126,121 @@ def command_config(args: dict):
             logger.info("No errors found")
         else:
             logger.info(f"Found {errors} errors")
+
+    elif args['push']:
+        dynamodb_client = boto3.client('dynamodb')
+        dynamodb_resource = boto3.resource('dynamodb')
+        table_name = args['remote_table_name']
+
+        status = check_remote_state_table(dynamodb_client, table_name)
+
+        if not status:
+            return
+
+        table = dynamodb_resource.Table(table_name)
+        table.put_item(
+            Item={
+                'env_name': f"_profile_{profile_name}",
+                'profile':  json.dumps(create_envvar_dict(args, config))
+            }
+        )
+        logger.info(f"Successfully pushed profile {profile_name} to DynamoDB")
+
+
+def check_remote_state_table(dynamodb, table_name):
+    try:
+        table_status = describe_remote_state_table(dynamodb, table_name)
+    except botocore.exceptions.NoCredentialsError:
+        logger.error("AWS credentials not found!")
+        return False
+    except Exception as e:
+        if hasattr(e, 'response') and 'Error' in e.response:
+            code = e.response['Error']['Code']
+            if code == 'ResourceNotFoundException':
+                table_status = create_remote_state_table(dynamodb, table_name)
+                if table_status is None:
+                    return False
+            else:
+                logger.error(e.response['Error']['Message'])
+                return False
+
+        else:
+            logger.error(f"Unknown exception raised: {e}")
+            return False
+
+    if table_status == 'DELETING':
+        logger.error("Table deletion is in progress, try again later")
+        return False
+
+    elif table_status == 'UPDATING':
+        logger.error("Table update is in progress, try again later")
+        return False
+
+    elif table_status == 'CREATING':
+        logger.info("Waiting for table creation...")
+        while table_status != 'ACTIVE':
+            time.sleep(0.1)
+            table_status = describe_remote_state_table(dynamodb, table_name)
+
+    return True
+
+
+def describe_remote_state_table(dynamodb, table_name):
+    response = dynamodb.describe_table(TableName=table_name)
+    table_status = response['Table']['TableStatus']
+    return table_status
+
+
+def create_remote_state_table(dynamodb, table_name):
+    try:
+        response = dynamodb.create_table(
+            AttributeDefinitions=[
+                {
+                    'AttributeName': 'env_name',
+                    'AttributeType': 'S'
+                },
+                {
+                    'AttributeName': 'last_updated',
+                    'AttributeType': 'S'
+                }
+            ],
+            TableName=table_name,
+            KeySchema=[
+                {
+                    'AttributeName': 'env_name',
+                    'KeyType':       'HASH'
+                },
+            ],
+            GlobalSecondaryIndexes=[
+                {
+                    'IndexName':  'env_name_last_updated_gsi',
+                    'KeySchema':  [
+                        {
+                            'AttributeName': 'env_name',
+                            'KeyType':       'HASH',
+                        },
+                        {
+                            'AttributeName': 'last_updated',
+                            'KeyType':       'RANGE',
+                        },
+                    ],
+                    'Projection': {
+                        'ProjectionType': 'ALL',
+                    }
+                },
+            ],
+            BillingMode='PAY_PER_REQUEST',
+        )
+        table_status = response['TableDescription']['TableStatus']
+        return table_status
+
+    except Exception as e:
+        if hasattr(e, 'response') and 'Error' in e.response:
+            logger.error(e.response['Error']['Message'])
+            return None
+        else:
+            logger.error(f"Unknown exception raised: {e}")
+            return None
 
 
 def check_profile(config, profile):
@@ -226,8 +352,8 @@ def main(args=sys.argv):
             # validators.check_cirn(args_dict['image_uri'])
 
             event = {
-                'branch':      args_dict['name'],
-                'image_uri':   args_dict['image_uri'] if 'image_uri' in args_dict else None,
+                'branch':    args_dict['name'],
+                'image_uri': args_dict['image_uri'] if 'image_uri' in args_dict else None,
             }
 
             args.handler(args_dict, event)
