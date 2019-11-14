@@ -25,8 +25,8 @@ def read_config(path):
 
 
 def create_parser():
-    parser = argparse.ArgumentParser(description='ECS Dynamic environment manager. '
-                                                 'Clone ecs environments easily.')
+    parser = argparse.ArgumentParser(description='ECS Dynamic Environment Manager. '
+                                                 'Clone Amazon ECS environments easily.')
 
     subparsers = parser.add_subparsers()
 
