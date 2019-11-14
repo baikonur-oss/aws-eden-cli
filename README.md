@@ -154,7 +154,11 @@ Successfully pushed profile default to DynamoDB
 
 # use the same command to overwrite existing profiles
 $ eden config --push -p default
-Successfully pushed profile default to DynamoDB
+Successfully pushed profile default to DynamoDB table eden
+
+# use --remote-delete to remove pushed profiles
+$ eden config --remote-delete -p default
+Successfully removed profile default from DynamoDB table eden
 
 ```
 
