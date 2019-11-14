@@ -128,15 +128,16 @@ def command_config(args: dict):
             logger.info(f"Found {errors} errors")
 
     elif args['push']:
-        dynamodb = boto3.client('dynamodb')
+        dynamodb_client = boto3.client('dynamodb')
+        dynamodb_resource = boto3.resource('dynamodb')
         table_name = args['remote_table_name']
 
-        status = check_remote_state_table(dynamodb, table_name)
+        status = check_remote_state_table(dynamodb_client, table_name)
 
         if not status:
             return
 
-        table = boto3.resource('dynamodb').Table(table_name)
+        table = dynamodb_resource.Table(table_name)
         table.put_item(
             Item={
                 'env_name': f"_profile_{profile_name}",
