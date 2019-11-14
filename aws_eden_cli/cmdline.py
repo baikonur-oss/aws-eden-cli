@@ -108,7 +108,7 @@ def command_config_check(args):
     config = utils.parse_config(args)
     if config is None:
         return
-    config, _ = utils.config_write_overrides(config, profile_name)
+    config, _ = utils.config_write_overrides(config, args)
 
     errors = 0
     for profile in config:
@@ -125,7 +125,7 @@ def command_config_push(args):
     config = utils.parse_config(args)
     if config is None:
         return
-    config, _ = utils.config_write_overrides(config, profile_name)
+    config, _ = utils.config_write_overrides(config, args)
 
     table_name = args['remote_table_name']
     table = dynamodb_resource.Table(table_name)
@@ -182,7 +182,7 @@ def command_create(args: dict, name, image_uri):
     config = utils.parse_config(args)
     if config is None:
         return
-    config, _ = utils.config_write_overrides(config, profile_name)
+    config, _ = utils.config_write_overrides(config, args)
 
     variables = utils.create_envvar_dict(args, config)
     function.create_env(name, image_uri, variables)
@@ -194,7 +194,7 @@ def command_delete(args: dict, name):
     config = utils.parse_config(args)
     if config is None:
         return
-    config, _ = utils.config_write_overrides(config, profile_name)
+    config, _ = utils.config_write_overrides(config, args)
 
     variables = utils.create_envvar_dict(args, config)
     function.delete_env(name, variables)
