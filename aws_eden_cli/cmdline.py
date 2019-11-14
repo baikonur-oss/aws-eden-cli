@@ -1,30 +1,19 @@
 import argparse
-import configparser
 import json
 import logging
 import os
 import sys
-import time
 from pathlib import Path
 
-import boto3
-import botocore
-from botocore.exceptions import ClientError
-
-from . import consts
 import aws_eden_core.methods as function
+import boto3
+
+from . import consts, utils, dynamodb
 
 dynamodb_client = boto3.client('dynamodb')
 dynamodb_resource = boto3.resource('dynamodb')
 
-parameters = consts.parameters
 logger = logging.getLogger()
-
-
-def read_config(path):
-    config = configparser.ConfigParser()
-    config.read(path)
-    return config
 
 
 def create_parser():
@@ -33,28 +22,48 @@ def create_parser():
 
     subparsers = parser.add_subparsers()
 
-    parser_config = subparsers.add_parser('config', help='Configure eden')
-    parser_config.set_defaults(handler=command_config)
-    parser_config.add_argument('--check', action='store_true',
-                               help='Check configuration file integrity')
-    parser_config.add_argument('--push', action='store_true',
-                               help='Push local profile to DynamoDB for use by eden API')
-    parser_config.add_argument('--remote-delete', action='store_true',
-                               help='Remove remote profile from DynamoDB')
-    parser_config.add_argument('--remote-table-name', type=str, required=False, default='eden',
-                               help='profile name in eden configuration file')
-
+    # eden create
     parser_create = subparsers.add_parser('create', help='Create environment or deploy to existent')
     parser_create.set_defaults(handler=command_create)
 
+    # eden delete
     parser_delete = subparsers.add_parser('delete', help='Delete environment')
     parser_delete.set_defaults(handler=command_delete)
 
-    for i in [parser_config, parser_create, parser_delete]:
-        for p in parameters:
+    # eden config *
+    parser_config = subparsers.add_parser('config', help='Configure eden')
+
+    # eden config setup
+    config_subparsers = parser_config.add_subparsers()
+    parser_config_setup = config_subparsers.add_parser('setup',
+                                                       help='Setup profiles for other commands')
+    parser_config_setup.set_defaults(handler=command_config_setup)
+
+    # eden config check
+    parser_config_check = config_subparsers.add_parser('check',
+                                                       help='Check configuration file integrity')
+    parser_config_check.set_defaults(handler=command_config_check)
+
+    # eden config push
+    parser_config_push = config_subparsers.add_parser('push',
+                                                      help='Push local profile to DynamoDB for use by eden API')
+    parser_config_push.set_defaults(handler=command_config_push)
+
+    # eden config remote_remove
+    parser_config_remote_delete = config_subparsers.add_parser('remote_remove',
+                                                               help='Remove remote profile from DynamoDB')
+    parser_config_remote_delete.set_defaults(handler=command_config_remote_delete)
+
+    # profile vars for no profile or profile override
+    for i in [parser_config_setup, parser_create, parser_delete]:
+        for p in consts.parameters:
             i.add_argument(p['flag'], type=str, required=False,
                            help=p['help_string'])
 
+    # switches for all subcommands
+    for i in [parser_config_setup, parser_config_check,  # local profile config commands
+              parser_config_push, parser_config_remote_delete,  # remote commands
+              parser_create, parser_delete]:
         i.add_argument('-p', '--profile', type=str, required=False, default='default',
                        help='profile name in eden configuration file')
 
@@ -62,6 +71,11 @@ def create_parser():
                        help='eden configuration file path')
 
         i.add_argument('-v', '--verbose', action='store_true')
+
+    # switches for remote subcommands
+    for i in [parser_config_push, ]:
+        i.add_argument('--remote-table-name', type=str, required=False, default='eden',
+                       help='profile name in eden configuration file')
 
     for i in [parser_create, parser_delete]:
         i.add_argument('--name', type=str, required=True, help='Environment name (branch name etc.)')
@@ -72,77 +86,51 @@ def create_parser():
     return parser
 
 
-def command_config(args: dict):
-    table_name = args['remote_table_name']
-    table = dynamodb_resource.Table(table_name)
-
-    default_config_path = os.path.expanduser('~/.eden')
-    if not os.path.exists(default_config_path):
-        os.makedirs(default_config_path)
-
-    config_file_path = os.path.expanduser(args['config_path'])
-    config_file = Path(config_file_path)
-    if not config_file.is_file():
-        logger.info(f"Config file {path} is empty")
+def command_config_setup(args: dict):
+    setup_logging(args['verbose'])
+    config = utils.parse_config(args)
+    if config is None:
         return
-
-    config = read_config(path)
-
-    updated = False
-
-    profile_name = args['profile']
-
-    if profile_name not in config:
-        config[profile_name] = {}
-
-    for parameter in parameters:
-        key = parameter['name']
-
-        if key not in args:
-            continue
-        value = args[key]
-
-        if value is None:
-            continue
-
-        logger.info(f"Setting {key} to {value} in profile {profile_name}")
-        config[profile_name][key] = value
-        updated = True
+    config, updated = utils.config_write_overrides(config, args)
 
     if updated:
-        with open(path, 'w') as configfile:
+        config_file_path = os.path.expanduser(args['config_path'])
+        config_file = Path(config_file_path)
+        with open(config_file, 'w') as configfile:
             config.write(configfile)
     else:
-        if not args['check'] and not args['push'] and not args['remote_delete']:
-            logger.error("No parameters to update were given, exiting")
-            return
-
-    if args['check']:
-        command_config_check(config)
-
-    elif args['push']:
-        command_config_push(args, config)
-
-    elif args['remote_delete']:
-        command_config_remote_delete(args)
+        logger.error("No parameters to update were given, exiting")
 
 
-def command_config_check(config):
+def command_config_check(args):
+    setup_logging(args['verbose'])
+    profile_name = args['profile']
+    config = utils.parse_config(args)
+    if config is None:
+        return
+    config, _ = utils.config_write_overrides(config, profile_name)
+
     errors = 0
     for profile in config:
-        errors += check_profile(config, profile)
+        errors += utils.check_profile(config, profile)
     if errors == 0:
         logger.info("No errors found")
     else:
         logger.info(f"Found {errors} errors")
 
 
-def command_config_push(args, config):
+def command_config_push(args):
+    setup_logging(args['verbose'])
     profile_name = args['profile']
+    config = utils.parse_config(args)
+    if config is None:
+        return
+    config, _ = utils.config_write_overrides(config, profile_name)
+
     table_name = args['remote_table_name']
     table = dynamodb_resource.Table(table_name)
 
-    status = check_remote_state_table(dynamodb_client, table_name)
+    status = dynamodb.check_remote_state_table(dynamodb_client, table_name)
 
     if not status:
         return
@@ -151,7 +139,7 @@ def command_config_push(args, config):
         table.put_item(
             Item={
                 'env_name': f"_profile_{profile_name}",
-                'profile':  json.dumps(create_envvar_dict(args, config))
+                'profile':  json.dumps(utils.create_envvar_dict(args, config))
             }
         )
     except Exception as e:
@@ -166,6 +154,7 @@ def command_config_push(args, config):
 
 
 def command_config_remote_delete(args):
+    setup_logging(args['verbose'])
     profile_name = args['profile']
     table_name = args['remote_table_name']
     table = dynamodb_resource.Table(table_name)
@@ -187,177 +176,28 @@ def command_config_remote_delete(args):
     logger.info(f"Successfully removed profile {profile_name} from DynamoDB table {table_name}")
 
 
-def check_remote_state_table(dynamodb, table_name):
-    try:
-        table_status = describe_remote_state_table(dynamodb, table_name)
-    except botocore.exceptions.NoCredentialsError:
-        logger.error("AWS credentials not found!")
-        return False
-    except Exception as e:
-        if hasattr(e, 'response') and 'Error' in e.response:
-            code = e.response['Error']['Code']
-            if code == 'ResourceNotFoundException':
-                table_status = create_remote_state_table(dynamodb, table_name)
-                if table_status is None:
-                    return False
-            else:
-                logger.error(e.response['Error']['Message'])
-                return False
-
-        else:
-            logger.error(f"Unknown exception raised: {e}")
-            return False
-
-    if table_status == 'DELETING':
-        logger.error("Table deletion is in progress, try again later")
-        return False
-
-    elif table_status == 'UPDATING':
-        logger.error("Table update is in progress, try again later")
-        return False
-
-    elif table_status == 'CREATING':
-        logger.info("Waiting for table creation...")
-        while table_status != 'ACTIVE':
-            time.sleep(0.1)
-            table_status = describe_remote_state_table(dynamodb, table_name)
-
-    return True
-
-
-def describe_remote_state_table(dynamodb, table_name):
-    response = dynamodb.describe_table(TableName=table_name)
-    table_status = response['Table']['TableStatus']
-    return table_status
-
-
-def create_remote_state_table(dynamodb, table_name):
-    try:
-        response = dynamodb.create_table(
-            AttributeDefinitions=[
-                {
-                    'AttributeName': 'env_name',
-                    'AttributeType': 'S'
-                },
-                {
-                    'AttributeName': 'last_updated',
-                    'AttributeType': 'S'
-                }
-            ],
-            TableName=table_name,
-            KeySchema=[
-                {
-                    'AttributeName': 'env_name',
-                    'KeyType':       'HASH'
-                },
-            ],
-            GlobalSecondaryIndexes=[
-                {
-                    'IndexName':  'env_name_last_updated_gsi',
-                    'KeySchema':  [
-                        {
-                            'AttributeName': 'env_name',
-                            'KeyType':       'HASH',
-                        },
-                        {
-                            'AttributeName': 'last_updated',
-                            'KeyType':       'RANGE',
-                        },
-                    ],
-                    'Projection': {
-                        'ProjectionType': 'ALL',
-                    }
-                },
-            ],
-            BillingMode='PAY_PER_REQUEST',
-        )
-        table_status = response['TableDescription']['TableStatus']
-        return table_status
-
-    except Exception as e:
-        if hasattr(e, 'response') and 'Error' in e.response:
-            logger.error(e.response['Error']['Message'])
-            return None
-        else:
-            logger.error(f"Unknown exception raised: {e}")
-            return None
-
-
-def check_profile(config, profile):
-    errors = 0
-    if profile == "DEFAULT":
-        logger.debug("Skipping ConfigParser DEFAULT profile (comes up even if not in file)")
-        return 0
-
-    if profile not in config:
-        logger.error(f"Profile {profile} is not in config file")
-        errors += 1
-        return errors
-
-    for parameter in parameters:
-        key = parameter['name']
-
-        if key not in config[profile]:
-            logger.error(f"Necessary key {key} is not provided for profile {profile}")
-            errors += 1
-            continue
-        value = config[profile][key]
-
-        if value is None:
-            logger.error(f"Necessary key {key} is None for profile {profile}")
-            errors += 1
-            continue
-
-        if not parameter['validator'](value):
-            logger.error(f"Validation failed for key {key} in profile {profile}")
-            errors += 1
-            continue
-    return errors
-
-
-def command_create(args: dict, event: dict):
-    path = os.path.expanduser('~/.eden')
-    if not os.path.exists(path):
-        os.makedirs(path)
-
-    path = os.path.expanduser(args['config_path'])
-    config = read_config(path)
-
-    variables = create_envvar_dict(args, config)
-    function.create_env(event['branch'], event['image_uri'], variables)
-
-
-def command_delete(args: dict, event: dict):
-    path = os.path.expanduser('~/.eden')
-    if not os.path.exists(path):
-        os.makedirs(path)
-
-    path = os.path.expanduser(args['config_path'])
-    config = read_config(path)
-
-    variables = create_envvar_dict(args, config)
-    function.delete_env(event['branch'], variables)
-
-
-def create_envvar_dict(args, config):
-    variables = {}
+def command_create(args: dict, name, image_uri):
+    setup_logging(args['verbose'])
     profile_name = args['profile']
+    config = utils.parse_config(args)
+    if config is None:
+        return
+    config, _ = utils.config_write_overrides(config, profile_name)
 
-    for p in parameters:
-        parameter_name = p['name']
+    variables = utils.create_envvar_dict(args, config)
+    function.create_env(name, image_uri, variables)
 
-        if parameter_name in args:
-            if args[parameter_name] is not None:
-                variables[p['envvar_name']] = args[parameter_name]
-                continue
-        if profile_name not in config or parameter_name not in config[profile_name]:
-            logger.error(f"Necessary parameter {parameter_name} not found in profile {profile_name} "
-                         f"and is not provided as an argument")
-            exit(-1)
-        else:
-            variables[p['envvar_name']] = config[profile_name][parameter_name]
 
-    return variables
+def command_delete(args: dict, name):
+    setup_logging(args['verbose'])
+    profile_name = args['profile']
+    config = utils.parse_config(args)
+    if config is None:
+        return
+    config, _ = utils.config_write_overrides(config, profile_name)
+
+    variables = utils.create_envvar_dict(args, config)
+    function.delete_env(name, variables)
 
 
 def setup_logging(debug):
@@ -385,18 +225,11 @@ def main(args=sys.argv):
     args = parser.parse_args(args=args)
     args_dict = vars(args)
 
-    setup_logging(args_dict['verbose'])
-
     if hasattr(args, 'handler'):
-        if args.handler != command_config:
-            # validators.check_cirn(args_dict['image_uri'])
-
-            event = {
-                'branch':    args_dict['name'],
-                'image_uri': args_dict['image_uri'] if 'image_uri' in args_dict else None,
-            }
-
-            args.handler(args_dict, event)
+        if args.handler == command_create:
+            args.handler(args_dict, args.name, args.image_uri)
+        elif args.handler == command_delete:
+            args.handler(args_dict, args.name)
         else:
             args.handler(args_dict)
     else:
