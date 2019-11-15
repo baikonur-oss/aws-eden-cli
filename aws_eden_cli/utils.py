@@ -89,7 +89,7 @@ def create_envvar_dict(args, config):
     variables = {}
     profile_name = args['profile']
 
-    for p in consts.parameters:
+    for parameter in consts.parameters:
         parameter_name = p['name']
         envvar_name = p['envvar_name']
 
