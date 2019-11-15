@@ -90,8 +90,8 @@ def create_envvar_dict(args, config):
     profile_name = args['profile']
 
     for parameter in consts.parameters:
-        parameter_name = p['name']
-        envvar_name = p['envvar_name']
+        parameter_name = parameter['name']
+        envvar_name = parameter['envvar_name']
 
         if parameter_name in args:
             if args[parameter_name] is not None:
