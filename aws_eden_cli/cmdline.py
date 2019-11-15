@@ -134,20 +134,11 @@ def command_config_push(args):
     if not status:
         return
 
-    try:
-        table.put_item(
-            Item={
-                'env_name': f"_profile_{profile_name}",
-                'profile':  json.dumps(utils.create_envvar_dict(args, config, args['profile']))
-            }
-        )
-    except Exception as e:
-        if hasattr(e, 'response') and 'Error' in e.response:
-            logger.error(e.response['Error']['Message'])
-            return
-        else:
-            logger.error(f"Unknown exception raised: {e}")
-            return
+    profile_dict = utils.create_envvar_dict(args, config, profile_name)
+
+    status = dynamodb.create_profile(table, profile_name, profile_dict)
+    if not status:
+        return
 
     logger.info(f"Successfully pushed profile {profile_name} to DynamoDB table {table_name}")
 
@@ -158,19 +149,9 @@ def command_config_remote_delete(args):
     table_name = args['remote_table_name']
     table = dynamodb_resource.Table(table_name)
 
-    try:
-        table.delete_item(
-            Key={
-                'env_name': f"_profile_{profile_name}",
-            },
-        )
-    except Exception as e:
-        if hasattr(e, 'response') and 'Error' in e.response:
-            logger.error(e.response['Error']['Message'])
-            return
-        else:
-            logger.error(f"Unknown exception raised: {e}")
-            return
+    status = dynamodb.delete_profile(table, profile_name)
+    if not status:
+        return
 
     logger.info(f"Successfully removed profile {profile_name} from DynamoDB table {table_name}")
 

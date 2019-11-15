@@ -100,3 +100,38 @@ def check_remote_state_table(dynamodb, table_name):
             table_status = describe_remote_state_table(dynamodb, table_name)
 
     return True
+
+
+def delete_profile(table, profile_name):
+    try:
+        table.delete_item(
+            Key={
+                'env_name': f"_profile_{profile_name}",
+            },
+        )
+    except Exception as e:
+        if hasattr(e, 'response') and 'Error' in e.response:
+            logger.error(e.response['Error']['Message'])
+            return False
+        else:
+            logger.error(f"Unknown exception raised: {e}")
+            return False
+    return True
+
+
+def create_profile(table, profile_name, profile_dict):
+    try:
+        table.put_item(
+            Item={
+                'env_name': f"_profile_{profile_name}",
+                'profile':  json.dumps(profile_dict)
+            }
+        )
+    except Exception as e:
+        if hasattr(e, 'response') and 'Error' in e.response:
+            logger.error(e.response['Error']['Message'])
+            return False
+        else:
+            logger.error(f"Unknown exception raised: {e}")
+            return False
+    return True
