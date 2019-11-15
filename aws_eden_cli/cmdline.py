@@ -73,9 +73,9 @@ def create_parser():
         i.add_argument('-v', '--verbose', action='store_true')
 
     # switches for remote subcommands
-    for i in [parser_config_push, ]:
+    for i in [parser_config_push, parser_config_remote_delete]:
         i.add_argument('--remote-table-name', type=str, required=False, default='eden',
-                       help='profile name in eden configuration file')
+                       help='Remote DynamoDB table name')
 
     for i in [parser_create, parser_delete]:
         i.add_argument('--name', type=str, required=True, help='Environment name (branch name etc.)')
