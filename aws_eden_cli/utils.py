@@ -28,10 +28,8 @@ def parse_config(args):
     return read_config(config_file)
 
 
-def config_write_overrides(config, args):
+def config_write_overrides(args, config, profile_name):
     updated = False
-
-    profile_name = args['profile']
 
     if profile_name not in config:
         config[profile_name] = {}
@@ -85,9 +83,8 @@ def check_profile(config, profile):
     return errors
 
 
-def create_envvar_dict(args, config):
+def create_envvar_dict(args, config, profile_name):
     variables = {}
-    profile_name = args['profile']
 
     for parameter in consts.parameters:
         parameter_name = parameter['name']

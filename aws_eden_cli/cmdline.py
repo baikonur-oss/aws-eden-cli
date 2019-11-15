@@ -91,7 +91,7 @@ def command_config_setup(args: dict):
     config = utils.parse_config(args)
     if config is None:
         return
-    config, updated = utils.config_write_overrides(config, args)
+    config, updated = utils.config_write_overrides(args, config, args['profile'])
 
     if updated:
         config_file_path = os.path.expanduser(args['config_path'])
@@ -107,7 +107,7 @@ def command_config_check(args):
     config = utils.parse_config(args)
     if config is None:
         return
-    config, _ = utils.config_write_overrides(config, args)
+    config, _ = utils.config_write_overrides(args, config, args['profile'])
 
     errors = 0
     for profile in config:
@@ -124,7 +124,7 @@ def command_config_push(args):
     config = utils.parse_config(args)
     if config is None:
         return
-    config, _ = utils.config_write_overrides(config, args)
+    config, _ = utils.config_write_overrides(args, config, args['profile'])
 
     table_name = args['remote_table_name']
     table = dynamodb_resource.Table(table_name)
@@ -138,7 +138,7 @@ def command_config_push(args):
         table.put_item(
             Item={
                 'env_name': f"_profile_{profile_name}",
-                'profile':  json.dumps(utils.create_envvar_dict(args, config))
+                'profile':  json.dumps(utils.create_envvar_dict(args, config, args['profile']))
             }
         )
     except Exception as e:
@@ -180,9 +180,9 @@ def command_create(args: dict, name, image_uri):
     config = utils.parse_config(args)
     if config is None:
         return
-    config, _ = utils.config_write_overrides(config, args)
+    config, _ = utils.config_write_overrides(args, config, args['profile'])
 
-    variables = utils.create_envvar_dict(args, config)
+    variables = utils.create_envvar_dict(args, config, args['profile'])
     function.create_env(name, image_uri, variables)
 
 
@@ -191,9 +191,9 @@ def command_delete(args: dict, name):
     config = utils.parse_config(args)
     if config is None:
         return
-    config, _ = utils.config_write_overrides(config, args)
+    config, _ = utils.config_write_overrides(args, config, args['profile'])
 
-    variables = utils.create_envvar_dict(args, config)
+    variables = utils.create_envvar_dict(args, config, args['profile'])
     function.delete_env(name, variables)
 
 
