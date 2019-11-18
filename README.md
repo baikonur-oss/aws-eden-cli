@@ -83,15 +83,38 @@ For example, you may want to have API, administration tool and a frontend servic
 $ pip3 install aws-eden-cli 
 
 $ eden -h
-usage: eden [-h] [-p PROFILE] [-c CONFIG_PATH] [-v] {config,create,delete} ...
+usage: eden [-h] {create,delete,config} ...
 
-create similar ecs environments easily.
+ECS Dynamic Environment Manager. Clone Amazon ECS environments easily.
 
 positional arguments:
-  {config,create,delete}
-    config              configure eden
-    create              create environment or deploy to existent
-    delete              delete environment
+  {create,delete,config}
+    create              Create environment or deploy to existent
+    delete              Delete environment
+    config              Configure eden
+
+optional arguments:
+  -h, --help            show this help message and exit
+```
+
+Hint: you can use -h on subcommands as well:
+```
+$ eden config -h
+usage: eden config [-h] {setup,check,push,remote-remove} ...
+
+positional arguments:
+  {setup,check,push,remote-remove}
+    setup               Setup profiles for other commands
+    check               Check configuration file integrity
+    push                Push local profile to DynamoDB for use by eden API
+    remote-remove       Remove remote profile from DynamoDB
+
+optional arguments:
+  -h, --help            show this help message and exit
+
+$ eden config push -h
+usage: eden config push [-h] [-p PROFILE] [-c CONFIG_PATH] [-v]
+                        [--remote-table-name REMOTE_TABLE_NAME]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -100,24 +123,30 @@ optional arguments:
   -c CONFIG_PATH, --config-path CONFIG_PATH
                         eden configuration file path
   -v, --verbose
+  --remote-table-name REMOTE_TABLE_NAME
+                        profile name in eden configuration file
 ```
 
 ### Configure
 ```
-$ eden config --config-bucket-key endpoints.json
-$ eden config --config-bucket-name servicename-config
-$ eden config --config-update-key api_endpoint
-$ eden config --config-name-prefix servicename-dev
-$ eden config --domain-name-prefix api
-$ eden config --dynamic-zone-id Zxxxxxxxxxxxx
-$ eden config --dynamic-zone-name dev.example.com.
-$ eden config --master-alb-arn arn:aws:elasticloadbalancing:ap-northeast-1:xxxxxxxxxxxx:loadbalancer/app/dev-alb-api-dynamic/xxxxxxxxxx
-$ eden config --name-prefix dev-dynamic
-$ eden config --reference-service-arn arn:aws:ecs:ap-northeast-1:xxxxxxxxxxxx:service/dev/dev01-api
-$ eden config --target-cluster dev
-$ eden config --target-container-name api
+# let's create a profile to work with, 
+# so we won't have to specify all the parameters every time
+
+$ eden config setup --config-bucket-key endpoints.json
+$ eden config setup --config-bucket-name servicename-config
+$ eden config setup --config-update-key api_endpoint
+$ eden config setup --config-name-prefix servicename-dev
+$ eden config setup --domain-name-prefix api
+$ eden config setup --dynamic-zone-id Zxxxxxxxxxxxx
+$ eden config setup --dynamic-zone-name dev.example.com.
+$ eden config setup --master-alb-arn arn:aws:elasticloadbalancing:ap-northeast-1:xxxxxxxxxxxx:loadbalancer/app/dev-alb-api-dynamic/xxxxxxxxxx
+$ eden config setup --name-prefix dev-dynamic
+$ eden config setup --reference-service-arn arn:aws:ecs:ap-northeast-1:xxxxxxxxxxxx:service/dev/dev01-api
+$ eden config setup --target-cluster dev
+$ eden config setup --target-container-name api
 
 # you can also edit ~/.eden/config directly
+# (you can see that commands above created a "default" profile)
 
 $ cat ~/.eden/config
 [default]
@@ -137,30 +166,38 @@ target_container_name = api
 
 # don't forget to check configuration file integrity
 
-$ eden config --check
+$ eden config check
 No errors found
 
 # you can specify multiple profiles in configuration
 # and select a profile with -p profile_name
 
-$ eden config --check -p default
+$ eden config check -p default
 No errors found
 
 # we can push profiles to DynamoDB for use by eden API
-# if eden table does not exist, eden cli will create it
-$ eden config --push -p default
+# (if eden table does not exist, aws-eden-cli will create it)
+
+$ eden config push -p default
 Waiting for table creation...
 Successfully pushed profile default to DynamoDB
 
 # use the same command to overwrite existing profiles
-$ eden config --push -p default
-Successfully pushed profile default to DynamoDB
+# (push to existing profile will result in overwrite)
+
+$ eden config push -p default
+Successfully pushed profile default to DynamoDB table eden
+
+# use remote-delete to remove remote profiles
+
+$ eden config remote-delete -p default
+Successfully removed profile default from DynamoDB table eden
 
 ```
 
 ### Execute commands
 ```
-$ eden create --name test --cirn xxxxxxxxxxxx.dkr.ecr.ap-northeast-1.amazonaws.com/servicename-api-dev:latest
+$ eden create --name test --image-uri xxxxxxxxxxxx.dkr.ecr.ap-northeast-1.amazonaws.com/servicename-api-dev:latest
 Checking if image xxxxxxxxxxxx.dkr.ecr.ap-northeast-1.amazonaws.com/servicename-api-dev:latest exists
 Image exists
 Retrieved reference service arn:aws:ecs:ap-northeast-1:xxxxxxxxxxxx:service/dev/dev01-api
@@ -193,5 +230,3 @@ Deleted target group arn:aws:elasticloadbalancing:ap-northeast-1:xxxxxxxxxxxx:ta
 Deleted all task definitions for family: dev-dynamic-test, 1 tasks deleted total
 Successfully finished deleting environment dev-dynamic-test
 ```
-
-
