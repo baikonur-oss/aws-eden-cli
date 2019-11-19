@@ -191,7 +191,7 @@ Successfully pushed profile default to DynamoDB
 $ eden config push -p default
 Successfully pushed profile default to DynamoDB table eden
 
-# use remote-delete to remove remote profiles
+# use remote-rm to remove remote profiles
 
 $ eden config remote-rm -p default
 Successfully removed profile default from DynamoDB table eden
