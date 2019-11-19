@@ -1,5 +1,5 @@
 import argparse
-import json
+import datetime
 import logging
 import os
 import sys
@@ -30,6 +30,10 @@ def create_parser():
     parser_delete = subparsers.add_parser('delete', help='Delete environment')
     parser_delete.set_defaults(handler=command_delete)
 
+    # eden delete
+    parser_ls = subparsers.add_parser('ls', help='List existing environments')
+    parser_ls.set_defaults(handler=command_ls)
+
     # eden config *
     parser_config = subparsers.add_parser('config', help='Configure eden')
 
@@ -50,8 +54,8 @@ def create_parser():
     parser_config_push.set_defaults(handler=command_config_push)
 
     # eden config remote_remove
-    parser_config_remote_delete = config_subparsers.add_parser('remote-remove',
-                                                               help='Remove remote profile from DynamoDB')
+    parser_config_remote_delete = config_subparsers.add_parser('remote_delete',
+                                                               help='Delete remote profile from DynamoDB')
     parser_config_remote_delete.set_defaults(handler=command_config_remote_delete)
 
     # profile vars for no profile or profile override
@@ -63,7 +67,7 @@ def create_parser():
     # switches for all subcommands
     for i in [parser_config_setup, parser_config_check,  # local profile config commands
               parser_config_push, parser_config_remote_delete,  # remote commands
-              parser_create, parser_delete]:
+              parser_create, parser_delete, parser_ls]:
         i.add_argument('-p', '--profile', type=str, required=False, default='default',
                        help='profile name in eden configuration file')
 
@@ -73,7 +77,7 @@ def create_parser():
         i.add_argument('-v', '--verbose', action='store_true')
 
     # switches for remote subcommands
-    for i in [parser_config_push, parser_config_remote_delete]:
+    for i in [parser_config_push, parser_config_remote_delete, parser_ls]:
         i.add_argument('--remote-table-name', type=str, required=False, default='eden',
                        help='Remote DynamoDB table name')
 
@@ -84,6 +88,25 @@ def create_parser():
                                                                             '(ECR repository path, image name and tag)')
 
     return parser
+
+
+def command_ls(args: dict):
+    setup_logging(args['verbose'])
+    table_name = args['remote_table_name']
+    table = dynamodb_resource.Table(table_name)
+
+    environments = dynamodb.fetch_all_environments(table)
+
+    for profile_name in environments:
+        logger.info(f"Profile {profile_name}:")
+
+        for environment in environments[profile_name]:
+            last_updated = datetime.datetime.fromtimestamp(float(environment['last_updated_time']))
+            logger.info(f"{environment['name']} {environment['endpoint']} (last updated: {last_updated.isoformat()})")
+
+        logger.info("")
+
+    return
 
 
 def command_config_setup(args: dict):

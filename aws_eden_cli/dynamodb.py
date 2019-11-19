@@ -1,3 +1,4 @@
+import json
 import logging
 import time
 
@@ -29,20 +30,20 @@ def create_remote_state_table(dynamodb, table_name):
             KeySchema=[
                 {
                     'AttributeName': 'env_name',
-                    'KeyType':       'HASH'
+                    'KeyType': 'HASH'
                 },
             ],
             GlobalSecondaryIndexes=[
                 {
-                    'IndexName':  'env_name_last_updated_gsi',
-                    'KeySchema':  [
+                    'IndexName': 'env_name_last_updated_gsi',
+                    'KeySchema': [
                         {
                             'AttributeName': 'env_name',
-                            'KeyType':       'HASH',
+                            'KeyType': 'HASH',
                         },
                         {
                             'AttributeName': 'last_updated',
-                            'KeyType':       'RANGE',
+                            'KeyType': 'RANGE',
                         },
                     ],
                     'Projection': {
@@ -124,7 +125,7 @@ def create_profile(table, profile_name, profile_dict):
         table.put_item(
             Item={
                 'env_name': f"_profile_{profile_name}",
-                'profile':  json.dumps(profile_dict)
+                'profile': json.dumps(profile_dict)
             }
         )
     except Exception as e:
@@ -135,3 +136,31 @@ def create_profile(table, profile_name, profile_dict):
             logger.error(f"Unknown exception raised: {e}")
             return False
     return True
+
+
+def fetch_all_environments(table):
+    environments = {}
+
+    try:
+        r = table.scan()
+    except Exception as e:
+        if hasattr(e, 'response') and 'Error' in e.response:
+            logger.error(e.response['Error']['Message'])
+            return None
+        else:
+            logger.error(f"Unknown exception raised: {e}")
+            return None
+
+    for item in r['Items']:
+        key: str = item.pop('env_name')
+
+        if '$' in key:
+            profile_name, env_name = key.split('$')
+
+            if profile_name not in environments:
+                environments[profile_name] = []
+
+            item['name'] = env_name
+            environments[profile_name].append(item)
+
+    return environments
