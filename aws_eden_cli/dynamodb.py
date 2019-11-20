@@ -1,3 +1,4 @@
+import datetime
 import json
 import logging
 import time
@@ -164,3 +165,22 @@ def fetch_all_environments(table):
             environments[profile_name].append(item)
 
     return environments
+
+
+def put_environment(table, profile_name, name, cname):
+    return table.put_item(
+        Item={
+            'env_name': f"{profile_name}${name}",
+            'last_updated_time': str(datetime.datetime.now().timestamp()),
+            'endpoint': cname,
+            'name': name,
+        }
+    )
+
+
+def delete_environment(table, profile_name, name):
+    return table.delete_item(
+        Key={
+            'env_name': f"{profile_name}${name}",
+        },
+    )

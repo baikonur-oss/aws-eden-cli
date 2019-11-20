@@ -4,7 +4,9 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 requirements = [
-    'aws-eden-core==0.1.0',
+    'aws-eden-core==0.1.2',
+    'botocore',
+    'boto3',
 ]
 
 setup(
