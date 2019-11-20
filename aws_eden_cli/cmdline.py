@@ -5,7 +5,7 @@ import os
 import sys
 from pathlib import Path
 
-import aws_eden_core.methods as function
+import aws_eden_core.methods
 import boto3
 
 from . import consts, utils, dynamodb
@@ -22,17 +22,26 @@ def create_parser():
 
     subparsers = parser.add_subparsers()
 
+    parsers = []
+    parsers_remote = []
+
     # eden create
     parser_create = subparsers.add_parser('create', help='Create environment or deploy to existent')
     parser_create.set_defaults(handler=command_create)
+    parsers.append(parser_create)
+    parsers_remote.append(parser_create)
 
     # eden delete
     parser_delete = subparsers.add_parser('delete', help='Delete environment')
     parser_delete.set_defaults(handler=command_delete)
+    parsers.append(parser_delete)
+    parsers_remote.append(parser_delete)
 
-    # eden delete
+    # eden list
     parser_ls = subparsers.add_parser('ls', help='List existing environments')
     parser_ls.set_defaults(handler=command_ls)
+    parsers.append(parser_ls)
+    parsers_remote.append(parser_ls)
 
     # eden config *
     parser_config = subparsers.add_parser('config', help='Configure eden')
@@ -42,21 +51,27 @@ def create_parser():
     parser_config_setup = config_subparsers.add_parser('setup',
                                                        help='Setup profiles for other commands')
     parser_config_setup.set_defaults(handler=command_config_setup)
+    parsers.append(parser_config_setup)
 
     # eden config check
     parser_config_check = config_subparsers.add_parser('check',
                                                        help='Check configuration file integrity')
     parser_config_check.set_defaults(handler=command_config_check)
+    parsers.append(parser_config_check)
 
     # eden config push
     parser_config_push = config_subparsers.add_parser('push',
                                                       help='Push local profile to DynamoDB for use by eden API')
     parser_config_push.set_defaults(handler=command_config_push)
+    parsers.append(parser_config_push)
+    parsers_remote.append(parser_config_push)
 
     # eden config remote_remove
     parser_config_remote_delete = config_subparsers.add_parser('remote-rm',
                                                                help='Delete remote profile from DynamoDB')
     parser_config_remote_delete.set_defaults(handler=command_config_remote_delete)
+    parsers.append(parser_config_remote_delete)
+    parsers_remote.append(parser_config_remote_delete)
 
     # profile vars for no profile or profile override
     for i in [parser_config_setup, parser_create, parser_delete]:
@@ -65,9 +80,7 @@ def create_parser():
                            help=p['help_string'])
 
     # switches for all subcommands
-    for i in [parser_config_setup, parser_config_check,  # local profile config commands
-              parser_config_push, parser_config_remote_delete,  # remote commands
-              parser_create, parser_delete, parser_ls]:
+    for i in parsers:
         i.add_argument('-p', '--profile', type=str, required=False, default='default',
                        help='profile name in eden configuration file')
 
@@ -77,7 +90,7 @@ def create_parser():
         i.add_argument('-v', '--verbose', action='store_true')
 
     # switches for remote subcommands
-    for i in [parser_config_push, parser_config_remote_delete, parser_ls]:
+    for i in parsers_remote:
         i.add_argument('--remote-table-name', type=str, required=False, default='eden',
                        help='Remote DynamoDB table name')
 
@@ -95,7 +108,11 @@ def command_ls(args: dict):
     table_name = args['remote_table_name']
     table = dynamodb_resource.Table(table_name)
 
-    environments = dynamodb.fetch_all_environments(table)
+    environments: dict = dynamodb.fetch_all_environments(table)
+
+    if len(environments) == 0:
+        logger.info("No environments available")
+        return
 
     for profile_name in environments:
         logger.info(f"Profile {profile_name}:")
@@ -181,24 +198,36 @@ def command_config_remote_delete(args):
 
 def command_create(args: dict, name, image_uri):
     setup_logging(args['verbose'])
+    profile_name = args['profile']
+    table_name = args['remote_table_name']
+    table = dynamodb_resource.Table(table_name)
+
     config = utils.parse_config(args)
     if config is None:
         return
     config, _ = utils.config_write_overrides(args, config, args['profile'])
 
     variables = utils.create_envvar_dict(args, config, args['profile'])
-    function.create_env(name, image_uri, variables)
+
+    r = aws_eden_core.methods.create_env(name, image_uri, variables)
+    dynamodb.put_environment(table, profile_name, r['name'], r['cname'])
 
 
 def command_delete(args: dict, name):
     setup_logging(args['verbose'])
+    profile_name = args['profile']
+    table_name = args['remote_table_name']
+    table = dynamodb_resource.Table(table_name)
+
     config = utils.parse_config(args)
     if config is None:
         return
     config, _ = utils.config_write_overrides(args, config, args['profile'])
 
     variables = utils.create_envvar_dict(args, config, args['profile'])
-    function.delete_env(name, variables)
+
+    r = aws_eden_core.methods.delete_env(name, variables)
+    dynamodb.delete_environment(table, profile_name, r['name'])
 
 
 def setup_logging(debug):

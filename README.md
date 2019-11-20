@@ -100,14 +100,14 @@ optional arguments:
 Hint: you can use -h on subcommands as well:
 ```
 $ eden config -h
-usage: eden config [-h] {setup,check,push,remote-remove} ...
+ usage: eden config [-h] {setup,check,push,remote-rm} ...
 
 positional arguments:
-  {setup,check,push,remote-remove}
+  {setup,check,push,remote-rm}
     setup               Setup profiles for other commands
     check               Check configuration file integrity
     push                Push local profile to DynamoDB for use by eden API
-    remote-remove       Remove remote profile from DynamoDB
+    remote-rm           Remove remote profile from DynamoDB
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -149,7 +149,7 @@ $ eden config setup --target-container-name api
 # (you can see that commands above created a "default" profile)
 
 $ cat ~/.eden/config
-[default]
+[api]
 name_prefix = dev-dynamic
 reference_service_arn = arn:aws:ecs:ap-northeast-1:xxxxxxxxxxxx:service/dev/dev01-api
 target_cluster = dev
@@ -175,65 +175,68 @@ No errors found
 # you can specify multiple profiles in configuration
 # and select a profile with -p profile_name
 
-$ eden config check -p default
+$ eden config check -p api
 No errors found
 
 # we can push profiles to DynamoDB for use by eden API
 # (if eden table does not exist, aws-eden-cli will create it)
 
-$ eden config push -p default
+$ eden config push -p api
 Waiting for table creation...
-Successfully pushed profile default to DynamoDB
+Successfully pushed profile api to DynamoDB
 
 # use the same command to overwrite existing profiles
 # (push to existing profile will result in overwrite)
 
-$ eden config push -p default
-Successfully pushed profile default to DynamoDB table eden
+$ eden config push -p api
+Successfully pushed profile api to DynamoDB table eden
 
 # use remote-rm to remove remote profiles
 
-$ eden config remote-rm -p default
-Successfully removed profile default from DynamoDB table eden
-
+$ eden config remote-rm -p api
+Successfully removed profile api from DynamoDB table eden
 ```
 
 ### Execute commands
 ```
-$ eden create --name test --image-uri xxxxxxxxxxxx.dkr.ecr.ap-northeast-1.amazonaws.com/servicename-api-dev:latest
-Checking if image xxxxxxxxxxxx.dkr.ecr.ap-northeast-1.amazonaws.com/servicename-api-dev:latest exists
+$ eden create -p api --name foo --image-uri xxxxxxxxxx.dkr.ecr.ap-northeast-1.amazonaws.com/api:latest
+Checking if image xxxxxxxxxx.dkr.ecr.ap-northeast-1.amazonaws.com/api:latest exists
 Image exists
-Retrieved reference service arn:aws:ecs:ap-northeast-1:xxxxxxxxxxxx:service/dev/dev01-api
-Retrieved reference task definition from arn:aws:ecs:ap-northeast-1:xxxxxxxxxxxx:task-definition/dev01-api:15
-Registered new task definition: arn:aws:ecs:ap-northeast-1:xxxxxxxxxxxx:task-definition/dev-dynamic-test:4
-Registered new task definition: arn:aws:ecs:ap-northeast-1:xxxxxxxxxxxx:task-definition/dev-dynamic-test:4
-Retrieved reference target group: arn:aws:elasticloadbalancing:ap-northeast-1:xxxxxxxxxxxx:targetgroup/dev01-api/9c68a5f91f34d9a4
-Existing target group dev-dynamic-test not found, will create new
-Created target group arn:aws:elasticloadbalancing:ap-northeast-1:xxxxxxxxxxxx:targetgroup/dev-dynamic-test/1c68c9e4c711a1f4
-ELBv2 listener rule for target group arn:aws:elasticloadbalancing:ap-northeast-1:xxxxxxxxxxxx:targetgroup/dev-dynamic-test/1c68c9e4c711a1f4 and host api-test.dev.example.com does not exist, will create new listener rule
-ECS Service dev-dynamic-test does not exist, will create new service
-Checking if record api-test.dev.example.com. exists in zone Zxxxxxxxxxxxx
-Successfully created CNAME: api-test.dev.example.com -> dev-alb-api-dynamic-xxxxxxxxx.ap-northeast-1.elb.amazonaws.com
-Updating config file s3://servicename-config/endpoints.json, environment dev-dynamic-test: api_endpoint -> api-test.dev.example.com
+Retrieved reference service arn:aws:ecs:ap-northeast-1:xxxxxxxxxx:service/dev/api
+Retrieved reference task definition from arn:aws:ecs:ap-northeast-1:xxxxxxxxxx:task-definition/api:20
+Registered new task definition: arn:aws:ecs:ap-northeast-1:xxxxxxxxxx:task-definition/dev-dynamic-api-foo:1
+Registered new task definition: arn:aws:ecs:ap-northeast-1:xxxxxxxxxx:task-definition/dev-dynamic-api-foo:1
+Retrieved reference target group: arn:aws:elasticloadbalancing:ap-northeast-1:xxxxxxxxxx:targetgroup/api/xxxxxxxxxxxx
+Existing target group dev-dynamic-api-foo not found, will create new
+Created target group arn:aws:elasticloadbalancing:ap-northeast-1:xxxxxxxxxx:targetgroup/dev-dynamic-api-foo/xxxxxxxxxxxx
+ELBv2 listener rule for target group arn:aws:elasticloadbalancing:ap-northeast-1:xxxxxxxxxx:targetgroup/dev-dynamic-api-foo/xxxxxxxxxxxx and host api-foo.dev.example.com does not exist, will create new listener rule
+ECS Service dev-dynamic-api-foo does not exist, will create new service
+Checking if record api-foo.dev.example.com. exists in zone Zxxxxxxxxx
+Successfully created CNAME: api-foo.dev.example.com -> dev-alb-api-dynamic-297517510.ap-northeast-1.elb.amazonaws.com
+Updating config file s3://example-com-config/endpoints.json, environment example-api-foo: nodeDomain -> api-foo.dev.example.com
 Existing environment not found, adding new
 Successfully updated config file
-Successfully finished creating environment dev-dynamic-test
+Successfully finished creating environment dev-dynamic-api-foo
 
 $ eden ls
-Profile default:
-dev-dynamic-test api-test.dev.example.com (last updated: 2019-11-19T19:36:39.821759)
+Profile api:
+dev-dynamic-api-foo api-foo.dev.example.com (last updated: 2019-11-20T19:44:10.179760)
 
-$ eden delete --name test
-Updating config file s3://servicename-config/endpoints.json, delete environment dev-dynamic-test: api_endpoint -> api-test.dev.example.com
-Existing environment found, and the only optional key is api_endpoint,deleting environment
+$ eden delete -p api --name foo
+Updating config file s3://example-com-config/endpoints.json, delete environment example-api-foo: nodeDomain -> api-foo.dev.example.com
+Existing environment found, and the only optional key is nodeDomain,deleting environment
 Successfully updated config file
-Checking if record api-test.dev.example.com. exists in zone Zxxxxxxxxxxxx
-Found existing record api-test.dev.example.com. in zone Zxxxxxxxxxxxx
-Successfully removed CNAME record api-test.dev.example.com
-ECS Service dev-dynamic-test exists, will delete
-Successfully deleted service dev-dynamic-test from cluster dev
-ELBv2 listener rule for target group arn:aws:elasticloadbalancing:ap-northeast-1:xxxxxxxxxxxx:targetgroup/dev-dynamic-test/1c68c9e4c711a1f4 and host api-test.dev.example.com found, will delete
-Deleted target group arn:aws:elasticloadbalancing:ap-northeast-1:xxxxxxxxxxxx:targetgroup/dev-dynamic-test/1c68c9e4c711a1f4
-Deleted all task definitions for family: dev-dynamic-test, 1 tasks deleted total
-Successfully finished deleting environment dev-dynamic-test
+Checking if record api-foo.dev.example.com. exists in zone Zxxxxxxxxx
+Found existing record api-foo.dev.example.com. in zone Zxxxxxxxxx
+Successfully removed CNAME record api-foo.dev.example.com
+ECS Service dev-dynamic-api-foo exists, will delete
+Successfully deleted service dev-dynamic-api-foo from cluster dev
+ELBv2 listener rule for target group arn:aws:elasticloadbalancing:ap-northeast-1:xxxxxxxxxx:targetgroup/dev-dynamic-api-foo/xxxxxxxxxxxx and host api-foo.dev.example.com found, will delete
+Deleted target group arn:aws:elasticloadbalancing:ap-northeast-1:xxxxxxxxxx:targetgroup/dev-dynamic-api-foo/xxxxxxxxxxxx
+Deleted all task definitions for family: dev-dynamic-api-foo, 1 tasks deleted total
+Successfully finished deleting environment dev-dynamic-api-foo
+
+$ eden ls
+No environments available
+
 ```
