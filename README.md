@@ -100,7 +100,7 @@ optional arguments:
 Hint: you can use -h on subcommands as well:
 ```
 $ eden config -h
-usage: eden config [-h] {setup,check,push,remote-remove} ...
+ usage: eden config [-h] {setup,check,push,remote-rm} ...
 
 positional arguments:
   {setup,check,push,remote-rm}
