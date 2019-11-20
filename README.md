@@ -168,7 +168,10 @@ target_container_name = api
 
 $ eden config check
 No errors found
+```
 
+### Profiles
+```
 # you can specify multiple profiles in configuration
 # and select a profile with -p profile_name
 
@@ -188,9 +191,9 @@ Successfully pushed profile default to DynamoDB
 $ eden config push -p default
 Successfully pushed profile default to DynamoDB table eden
 
-# use remote-delete to remove remote profiles
+# use remote-rm to remove remote profiles
 
-$ eden config remote-delete -p default
+$ eden config remote-rm -p default
 Successfully removed profile default from DynamoDB table eden
 
 ```
@@ -215,6 +218,10 @@ Updating config file s3://servicename-config/endpoints.json, environment dev-dyn
 Existing environment not found, adding new
 Successfully updated config file
 Successfully finished creating environment dev-dynamic-test
+
+$ eden ls
+Profile default:
+dev-dynamic-test api-test.dev.example.com (last updated: 2019-11-19T19:36:39.821759)
 
 $ eden delete --name test
 Updating config file s3://servicename-config/endpoints.json, delete environment dev-dynamic-test: api_endpoint -> api-test.dev.example.com
