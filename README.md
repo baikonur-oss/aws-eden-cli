@@ -103,11 +103,11 @@ $ eden config -h
 usage: eden config [-h] {setup,check,push,remote-remove} ...
 
 positional arguments:
-  {setup,check,push,remote-remove}
+  {setup,check,push,remote-rm}
     setup               Setup profiles for other commands
     check               Check configuration file integrity
     push                Push local profile to DynamoDB for use by eden API
-    remote-remove       Remove remote profile from DynamoDB
+    remote-rm           Remove remote profile from DynamoDB
 
 optional arguments:
   -h, --help            show this help message and exit
