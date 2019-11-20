@@ -168,19 +168,35 @@ def fetch_all_environments(table):
 
 
 def put_environment(table, profile_name, name, cname):
-    return table.put_item(
-        Item={
-            'env_name': f"{profile_name}${name}",
-            'last_updated_time': str(datetime.datetime.now().timestamp()),
-            'endpoint': cname,
-            'name': name,
-        }
-    )
+    try:
+        return table.put_item(
+            Item={
+                'env_name': f"{profile_name}${name}",
+                'last_updated_time': str(datetime.datetime.now().timestamp()),
+                'endpoint': cname,
+                'name': name,
+            }
+        )
+    except Exception as e:
+        if hasattr(e, 'response') and 'Error' in e.response:
+            logger.error(e.response['Error']['Message'])
+            return None
+        else:
+            logger.error(f"Unknown exception raised: {e}")
+            return None
 
 
 def delete_environment(table, profile_name, name):
-    return table.delete_item(
-        Key={
-            'env_name': f"{profile_name}${name}",
-        },
-    )
+    try:
+        return table.delete_item(
+            Key={
+                'env_name': f"{profile_name}${name}",
+            },
+        )
+    except Exception as e:
+        if hasattr(e, 'response') and 'Error' in e.response:
+            logger.error(e.response['Error']['Message'])
+            return None
+        else:
+            logger.error(f"Unknown exception raised: {e}")
+            return None
