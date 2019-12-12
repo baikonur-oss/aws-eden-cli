@@ -176,9 +176,8 @@ No errors found
 ```
 
 ### Profiles
-```console
-# you can specify multiple profiles in configuration
-# and select a profile with -p profile_name
+You can create multiple profiles in configuration 
+and specify a profile to use with `-p profile_name` for all commands.
 
 ```console
 $ eden config check -p api
