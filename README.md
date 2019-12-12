@@ -79,7 +79,7 @@ For example, you may want to have API, administration tool and a frontend servic
 
 ## Usage (CLI interface)
 ### Installation
-```
+```console
 $ pip3 install aws-eden-cli 
 
 $ eden -h
@@ -98,7 +98,7 @@ optional arguments:
 ```
 
 Hint: you can use -h on subcommands as well:
-```
+```console
 $ eden config -h
  usage: eden config [-h] {setup,check,push,remote-rm} ...
 
@@ -128,7 +128,7 @@ optional arguments:
 ```
 
 ### Configure
-```
+```console
 # let's create a profile to work with, 
 # so we won't have to specify all the parameters every time
 
@@ -171,7 +171,7 @@ No errors found
 ```
 
 ### Profiles
-```
+```console
 # you can specify multiple profiles in configuration
 # and select a profile with -p profile_name
 
@@ -198,7 +198,7 @@ Successfully removed profile api from DynamoDB table eden
 ```
 
 ### Execute commands
-```
+```console
 $ eden create -p api --name foo --image-uri xxxxxxxxxx.dkr.ecr.ap-northeast-1.amazonaws.com/api:latest
 Checking if image xxxxxxxxxx.dkr.ecr.ap-northeast-1.amazonaws.com/api:latest exists
 Image exists
