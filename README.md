@@ -98,6 +98,7 @@ optional arguments:
 ```
 
 Hint: you can use -h on subcommands as well:
+
 ```console
 $ eden config -h
  usage: eden config [-h] {setup,check,push,remote-rm} ...
@@ -128,10 +129,10 @@ optional arguments:
 ```
 
 ### Configure
-```console
-# let's create a profile to work with, 
-# so we won't have to specify all the parameters every time
+Let's create a profile to work with, 
+so we won't have to specify all the parameters every time
 
+```console
 $ eden config setup --config-bucket-key endpoints.json
 $ eden config setup --config-bucket-name servicename-config
 $ eden config setup --config-update-key api_endpoint
@@ -144,10 +145,12 @@ $ eden config setup --name-prefix dev-dynamic
 $ eden config setup --reference-service-arn arn:aws:ecs:ap-northeast-1:xxxxxxxxxxxx:service/dev/dev01-api
 $ eden config setup --target-cluster dev
 $ eden config setup --target-container-name api
+```
 
-# you can also edit ~/.eden/config directly
-# (you can see that commands above created a "default" profile)
+Configuration is saved to `~/.eden/config`. 
+Commands above created a "default" profile. 
 
+```console
 $ cat ~/.eden/config
 [api]
 name_prefix = dev-dynamic
@@ -163,9 +166,11 @@ config_update_key = api_endpoint
 config_env_type = dev
 config_name_prefix = servicename-dev
 target_container_name = api
+```
 
-# don't forget to check configuration file integrity
+Don't forget to check configuration file integrit
 
+```console
 $ eden config check
 No errors found
 ```
@@ -175,24 +180,31 @@ No errors found
 # you can specify multiple profiles in configuration
 # and select a profile with -p profile_name
 
+```console
 $ eden config check -p api
 No errors found
+```
 
-# we can push profiles to DynamoDB for use by eden API
-# (if eden table does not exist, aws-eden-cli will create it)
+We can push profiles to DynamoDB for use by eden API 
+(if eden table does not exist, aws-eden-cli will create it)
 
+```console
 $ eden config push -p api
 Waiting for table creation...
 Successfully pushed profile api to DynamoDB
+```
 
-# use the same command to overwrite existing profiles
-# (push to existing profile will result in overwrite)
+Use the same command to overwrite existing profiles 
+(push to existing profile will result in overwrite)
 
+```console
 $ eden config push -p api
 Successfully pushed profile api to DynamoDB table eden
+```
 
-# use remote-rm to remove remote profiles
+Use remote-rm to remove remote profiles
 
+```console
 $ eden config remote-rm -p api
 Successfully removed profile api from DynamoDB table eden
 ```
@@ -238,5 +250,4 @@ Successfully finished deleting environment dev-dynamic-api-foo
 
 $ eden ls
 No environments available
-
 ```
