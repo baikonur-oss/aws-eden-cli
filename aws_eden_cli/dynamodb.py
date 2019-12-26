@@ -4,6 +4,7 @@ import logging
 import time
 
 import botocore
+from boto3.dynamodb.conditions import Key
 
 logger = logging.getLogger()
 
@@ -19,7 +20,11 @@ def create_remote_state_table(dynamodb, table_name):
         response = dynamodb.create_table(
             AttributeDefinitions=[
                 {
-                    'AttributeName': 'env_name',
+                    'AttributeName': 'type',
+                    'AttributeType': 'S'
+                },
+                {
+                    'AttributeName': 'name',
                     'AttributeType': 'S'
                 },
                 {
@@ -30,16 +35,20 @@ def create_remote_state_table(dynamodb, table_name):
             TableName=table_name,
             KeySchema=[
                 {
-                    'AttributeName': 'env_name',
+                    'AttributeName': 'type',
                     'KeyType': 'HASH'
+                },
+                {
+                    'AttributeName': 'name',
+                    'KeyType': 'RANGE'
                 },
             ],
             GlobalSecondaryIndexes=[
                 {
-                    'IndexName': 'env_name_last_updated_gsi',
+                    'IndexName': 'name_last_updated_gsi',
                     'KeySchema': [
                         {
-                            'AttributeName': 'env_name',
+                            'AttributeName': 'name',
                             'KeyType': 'HASH',
                         },
                         {
@@ -108,7 +117,8 @@ def delete_profile(table, profile_name):
     try:
         table.delete_item(
             Key={
-                'env_name': f"_profile_{profile_name}",
+                'type': '_profile',
+                'name': profile_name,
             },
         )
     except Exception as e:
@@ -125,7 +135,8 @@ def create_profile(table, profile_name, profile_dict):
     try:
         table.put_item(
             Item={
-                'env_name': f"_profile_{profile_name}",
+                'type': '_profile',
+                'name': profile_name,
                 'profile': json.dumps(profile_dict)
             }
         )
@@ -167,11 +178,62 @@ def fetch_all_environments(table):
     return environments
 
 
+def fetch_all_profiles(table):
+    profiles = {}
+
+    try:
+        r = table.query(
+            KeyConditionExpression=Key('type').eq('_profile')
+        )
+    except Exception as e:
+        if hasattr(e, 'response') and 'Error' in e.response:
+            logger.error(e.response['Error']['Message'])
+            return None
+        else:
+            logger.error(f"Unknown exception raised: {e}")
+            return None
+
+    for item in r['Items']:
+        logger.info(item)
+        profiles += {
+            'name': item['name'],
+            'profile': item['profile'],
+        }
+
+    return profiles
+
+
+def fetch_profile(table, profile_name):
+    try:
+        r = table.query(
+            KeyConditionExpression=Key('type').eq('_profile') & Key('name').eq(profile_name)
+        )
+    except Exception as e:
+        if hasattr(e, 'response') and 'Error' in e.response:
+            logger.error(e.response['Error']['Message'])
+            return None
+        else:
+            logger.error(f"Unknown exception raised: {e}")
+            return None
+
+    if 'Items' not in r or len(r['Items']) == 0:
+        logger.warning(f"Profile {profile_name} not found in remote table!")
+        return None
+    elif len(r['Items']) != 1:
+        logger.warning(f"Got multiple profiles for profile name {profile_name} from remote table!")
+        return None
+    elif 'profile' not in r['Items'][0]:
+        logger.warning(f"Profile {profile_name} does not contain any parameters!")
+        return None
+
+    return r['Items'][0]['profile']
+
+
 def put_environment(table, profile_name, name, cname):
     try:
         return table.put_item(
             Item={
-                'env_name': f"{profile_name}${name}",
+                'type': profile_name,
                 'last_updated_time': str(datetime.datetime.now().timestamp()),
                 'endpoint': cname,
                 'name': name,
@@ -190,7 +252,8 @@ def delete_environment(table, profile_name, name):
     try:
         return table.delete_item(
             Key={
-                'env_name': f"{profile_name}${name}",
+                'type': profile_name,
+                'name': name,
             },
         )
     except Exception as e:
