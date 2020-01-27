@@ -198,7 +198,12 @@ def fetch_all_profiles(table):
         )
     except Exception as e:
         if hasattr(e, 'response') and 'Error' in e.response:
-            logger.error(e.response['Error']['Message'])
+            code = e.response['Error']['Code']
+            if code == 'ResourceNotFoundException':
+                logger.error(f"eden table not found, please create table with "
+                             f"\"eden config push\" or \"eden create\" first")
+            else:
+                logger.error(e.response['Error']['Message'])
             return None
         else:
             logger.error(f"Unknown exception raised: {e}")
