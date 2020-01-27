@@ -165,7 +165,8 @@ def fetch_all_environments(table):
         if hasattr(e, 'response') and 'Error' in e.response:
             code = e.response['Error']['Code']
             if code == 'ResourceNotFoundException':
-                logger.error(f"eden table not found, please create table with \"eden config push\" first")
+                logger.error(f"eden table not found, please create table with "
+                             f"\"eden config push\" or \"eden create\" first")
             else:
                 logger.error(e.response['Error']['Message'])
             return None
