@@ -124,6 +124,9 @@ def command_ls(args: dict):
 
     environments: dict = dynamodb.fetch_all_environments(table)
 
+    if environments is None:
+        return
+
     if len(environments) == 0:
         logger.info("No environments available")
         return
@@ -145,7 +148,14 @@ def command_config_ls(args: dict):
     table_name = args['remote_table_name']
     table = dynamodb_resource.Table(table_name)
 
+    status = dynamodb.check_remote_state_table(dynamodb_client, table)
+    if not status:
+        return
+
     profiles: dict = dynamodb.fetch_all_profiles(table)
+
+    if profiles is None:
+        return
 
     if len(profiles) == 0:
         logger.info("No profiles available")
@@ -205,8 +215,7 @@ def command_config_push(args):
     table_name = args['remote_table_name']
     table = dynamodb_resource.Table(table_name)
 
-    status = dynamodb.check_remote_state_table(dynamodb_client, table_name)
-
+    status = dynamodb.check_remote_state_table(dynamodb_client, table_name, True)
     if not status:
         return
 
@@ -231,7 +240,6 @@ def command_config_pull(args):
     table = dynamodb_resource.Table(table_name)
 
     status = dynamodb.check_remote_state_table(dynamodb_client, table_name)
-
     if not status:
         return
 
@@ -269,6 +277,10 @@ def command_create(args: dict, name, image_uri):
     table_name = args['remote_table_name']
     table = dynamodb_resource.Table(table_name)
 
+    status = dynamodb.check_remote_state_table(dynamodb_client, table, True)
+    if not status:
+        return
+
     config = utils.parse_config(args)
     if config is None:
         return
@@ -285,6 +297,10 @@ def command_delete(args: dict, name):
     profile_name = args['profile']
     table_name = args['remote_table_name']
     table = dynamodb_resource.Table(table_name)
+
+    status = dynamodb.check_remote_state_table(dynamodb_client, table)
+    if not status:
+        return
 
     config = utils.parse_config(args)
     if config is None:

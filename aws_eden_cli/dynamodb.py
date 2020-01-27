@@ -45,10 +45,10 @@ def create_remote_state_table(dynamodb, table_name):
             ],
             GlobalSecondaryIndexes=[
                 {
-                    'IndexName': 'name_last_updated_gsi',
+                    'IndexName': 'type_name_last_updated_gsi',
                     'KeySchema': [
                         {
-                            'AttributeName': 'name',
+                            'AttributeName': 'type_name',
                             'KeyType': 'HASH',
                         },
                         {
@@ -75,7 +75,7 @@ def create_remote_state_table(dynamodb, table_name):
             return None
 
 
-def check_remote_state_table(dynamodb, table_name):
+def check_remote_state_table(dynamodb, table_name: str, create_if_not_exist=False):
     try:
         table_status = describe_remote_state_table(dynamodb, table_name)
     except botocore.exceptions.NoCredentialsError:
@@ -85,7 +85,13 @@ def check_remote_state_table(dynamodb, table_name):
         if hasattr(e, 'response') and 'Error' in e.response:
             code = e.response['Error']['Code']
             if code == 'ResourceNotFoundException':
-                table_status = create_remote_state_table(dynamodb, table_name)
+                if create_if_not_exist:
+                    logger.error(f"Remote state table {table_name} does not exist, creating...")
+                    table_status = create_remote_state_table(dynamodb, table_name)
+                else:
+                    logger.error(f"Remote state table {table_name} does not exist")
+                    return False
+
                 if table_status is None:
                     return False
             else:
@@ -157,7 +163,11 @@ def fetch_all_environments(table):
         r = table.scan()
     except Exception as e:
         if hasattr(e, 'response') and 'Error' in e.response:
-            logger.error(e.response['Error']['Message'])
+            code = e.response['Error']['Code']
+            if code == 'ResourceNotFoundException':
+                logger.error(f"eden table not found, please create table with \"eden config push\" first")
+            else:
+                logger.error(e.response['Error']['Message'])
             return None
         else:
             logger.error(f"Unknown exception raised: {e}")
