@@ -69,7 +69,7 @@ def create_parser():
     # eden config pull
     parser_config_pull = config_subparsers.add_parser('pull',
                                                       help='Pull remote profile to local configuration')
-    parser_config_push.set_defaults(handler=command_config_pull)
+    parser_config_pull.set_defaults(handler=command_config_pull)
     parsers.append(parser_config_pull)
     parsers_remote.append(parser_config_pull)
 
@@ -148,7 +148,7 @@ def command_config_ls(args: dict):
     table_name = args['remote_table_name']
     table = dynamodb_resource.Table(table_name)
 
-    status = dynamodb.check_remote_state_table(dynamodb_client, table)
+    status = dynamodb.check_remote_state_table(dynamodb_client, table_name)
     if not status:
         return
 
@@ -215,7 +215,7 @@ def command_config_push(args):
     table_name = args['remote_table_name']
     table = dynamodb_resource.Table(table_name)
 
-    status = dynamodb.check_remote_state_table(dynamodb_client, table_name, True)
+    status = dynamodb.check_remote_state_table(dynamodb_client, table_name, auto_create=True)
     if not status:
         return
 
@@ -264,6 +264,10 @@ def command_config_remote_delete(args):
     table_name = args['remote_table_name']
     table = dynamodb_resource.Table(table_name)
 
+    status = dynamodb.check_remote_state_table(dynamodb_client, table_name)
+    if not status:
+        return
+
     status = dynamodb.delete_profile(table, profile_name)
     if not status:
         return
@@ -277,7 +281,7 @@ def command_create(args: dict, name, image_uri):
     table_name = args['remote_table_name']
     table = dynamodb_resource.Table(table_name)
 
-    status = dynamodb.check_remote_state_table(dynamodb_client, table, True)
+    status = dynamodb.check_remote_state_table(dynamodb_client, table_name, True)
     if not status:
         return
 
@@ -298,7 +302,7 @@ def command_delete(args: dict, name):
     table_name = args['remote_table_name']
     table = dynamodb_resource.Table(table_name)
 
-    status = dynamodb.check_remote_state_table(dynamodb_client, table)
+    status = dynamodb.check_remote_state_table(dynamodb_client, table_name)
     if not status:
         return
 

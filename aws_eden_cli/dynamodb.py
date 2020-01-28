@@ -28,6 +28,10 @@ def create_remote_state_table(dynamodb, table_name):
                     'AttributeType': 'S'
                 },
                 {
+                    'AttributeName': 'type_name',
+                    'AttributeType': 'S'
+                },
+                {
                     'AttributeName': 'last_updated',
                     'AttributeType': 'S'
                 }
@@ -75,7 +79,7 @@ def create_remote_state_table(dynamodb, table_name):
             return None
 
 
-def check_remote_state_table(dynamodb, table_name: str, create_if_not_exist=False):
+def check_remote_state_table(dynamodb, table_name: str, auto_create: bool = False):
     try:
         table_status = describe_remote_state_table(dynamodb, table_name)
     except botocore.exceptions.NoCredentialsError:
@@ -85,7 +89,7 @@ def check_remote_state_table(dynamodb, table_name: str, create_if_not_exist=Fals
         if hasattr(e, 'response') and 'Error' in e.response:
             code = e.response['Error']['Code']
             if code == 'ResourceNotFoundException':
-                if create_if_not_exist:
+                if auto_create:
                     logger.error(f"Remote state table {table_name} does not exist, creating...")
                     table_status = create_remote_state_table(dynamodb, table_name)
                 else:
@@ -143,6 +147,7 @@ def create_profile(table, profile_name, profile_dict):
             Item={
                 'type': '_profile',
                 'name': profile_name,
+                'type_name': f"_profile_{profile_name}",
                 'profile': json.dumps(profile_dict)
             }
         )
@@ -250,9 +255,10 @@ def put_environment(table, profile_name, name, cname):
         return table.put_item(
             Item={
                 'type': profile_name,
+                'name': name,
+                'type_name': f"{type}_{profile_name}",
                 'last_updated_time': str(datetime.datetime.now().timestamp()),
                 'endpoint': cname,
-                'name': name,
             }
         )
     except Exception as e:
