@@ -1,5 +1,8 @@
 from aws_eden_core import validators
 
+DEFAULT_TABLE_NAME = 'eden'
+DEFAULT_PROFILE_NAME = 'default'
+
 parameters = [
     {
         'name': 'endpoint_s3_bucket_name',
@@ -79,3 +82,7 @@ parameters = [
         'flag': '--reference-service-arn',
     },
 ]
+
+parameter_names = set()
+for p in parameters:
+    parameter_names.add(p['name'])

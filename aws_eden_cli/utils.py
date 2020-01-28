@@ -28,11 +28,15 @@ def parse_config(args):
     return read_config(config_file)
 
 
-def config_write_overrides(args, config, profile_name):
+def config_write_overrides(args, config, profile_name, fail_on_missing_non_default_profile=True):
     updated = False
 
     if profile_name not in config:
         config[profile_name] = {}
+
+        if profile_name != consts.DEFAULT_PROFILE_NAME and fail_on_missing_non_default_profile:
+            logger.error("")
+            return None, None
 
     for parameter in consts.parameters:
         key = parameter['name']
@@ -80,6 +84,13 @@ def check_profile(config, profile):
             logger.error(f"Validation failed for key {key} in profile {profile}")
             errors += 1
             continue
+
+    for k in config[profile]:
+        if k not in consts.parameter_names:
+            logger.error(f"Unknown config key {k} in profile {profile}")
+            errors += 1
+            continue
+
     return errors
 
 

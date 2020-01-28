@@ -6,14 +6,13 @@ import sys
 from pathlib import Path
 
 import aws_eden_core.methods
-import boto3
 
 from . import consts, utils, dynamodb
 
-dynamodb_client = boto3.client('dynamodb')
-dynamodb_resource = boto3.resource('dynamodb')
-
 logger = logging.getLogger()
+
+handlers_remote = []
+state = dynamodb.DynamoDBState(consts.DEFAULT_TABLE_NAME)
 
 
 def create_parser():
@@ -30,18 +29,21 @@ def create_parser():
     parser_create.set_defaults(handler=command_create)
     parsers.append(parser_create)
     parsers_remote.append(parser_create)
+    handlers_remote.append(command_create)
 
     # eden delete
     parser_delete = subparsers.add_parser('delete', help='Delete environment')
     parser_delete.set_defaults(handler=command_delete)
     parsers.append(parser_delete)
     parsers_remote.append(parser_delete)
+    handlers_remote.append(command_delete)
 
     # eden list
     parser_ls = subparsers.add_parser('ls', help='List existing environments')
     parser_ls.set_defaults(handler=command_ls)
     parsers.append(parser_ls)
     parsers_remote.append(parser_ls)
+    handlers_remote.append(command_ls)
 
     # eden config *
     parser_config = subparsers.add_parser('config', help='Configure eden')
@@ -65,6 +67,7 @@ def create_parser():
     parser_config_push.set_defaults(handler=command_config_push)
     parsers.append(parser_config_push)
     parsers_remote.append(parser_config_push)
+    handlers_remote.append(command_config_push)
 
     # eden config pull
     parser_config_pull = config_subparsers.add_parser('pull',
@@ -72,6 +75,7 @@ def create_parser():
     parser_config_pull.set_defaults(handler=command_config_pull)
     parsers.append(parser_config_pull)
     parsers_remote.append(parser_config_pull)
+    handlers_remote.append(command_config_pull)
 
     # eden config ls
     parser_config_ls = config_subparsers.add_parser('ls',
@@ -79,6 +83,7 @@ def create_parser():
     parser_config_ls.set_defaults(handler=command_config_ls)
     parsers.append(parser_config_ls)
     parsers_remote.append(parser_config_ls)
+    handlers_remote.append(command_config_ls)
 
     # eden config remote_remove
     parser_config_remote_delete = config_subparsers.add_parser('remote-rm',
@@ -86,6 +91,7 @@ def create_parser():
     parser_config_remote_delete.set_defaults(handler=command_config_remote_delete)
     parsers.append(parser_config_remote_delete)
     parsers_remote.append(parser_config_remote_delete)
+    handlers_remote.append(command_config_remote_delete)
 
     # profile vars for no profile or profile override
     for i in [parser_config_setup, parser_create, parser_delete]:
@@ -95,7 +101,7 @@ def create_parser():
 
     # switches for all subcommands
     for i in parsers:
-        i.add_argument('-p', '--profile', type=str, required=False, default='default',
+        i.add_argument('-p', '--profile', type=str, required=False, default=consts.DEFAULT_PROFILE_NAME,
                        help='profile name in eden configuration file')
 
         i.add_argument('-c', '--config-path', type=str, required=False, default='~/.eden/config',
@@ -105,7 +111,7 @@ def create_parser():
 
     # switches for remote subcommands
     for i in parsers_remote:
-        i.add_argument('--remote-table-name', type=str, required=False, default='eden',
+        i.add_argument('--remote-table-name', type=str, required=False, default=consts.DEFAULT_TABLE_NAME,
                        help='Remote DynamoDB table name')
 
     for i in [parser_create, parser_delete]:
@@ -117,12 +123,10 @@ def create_parser():
     return parser
 
 
-def command_ls(args: dict):
-    setup_logging(args['verbose'])
-    table_name = args['remote_table_name']
-    table = dynamodb_resource.Table(table_name)
+def command_ls(args_dict: dict):
+    setup_logging(args_dict['verbose'])
 
-    environments: dict = dynamodb.fetch_all_environments(table)
+    environments: dict = state.fetch_all_environments()
 
     if environments is None:
         return
@@ -143,16 +147,14 @@ def command_ls(args: dict):
     return
 
 
-def command_config_ls(args: dict):
-    setup_logging(args['verbose'])
-    table_name = args['remote_table_name']
-    table = dynamodb_resource.Table(table_name)
+def command_config_ls(args_dict: dict):
+    setup_logging(args_dict['verbose'])
 
-    status = dynamodb.check_remote_state_table(dynamodb_client, table_name)
+    status = state.check_remote_state_table()
     if not status:
         return
 
-    profiles: dict = dynamodb.fetch_all_profiles(table)
+    profiles: dict = state.fetch_all_profiles()
 
     if profiles is None:
         return
@@ -172,15 +174,20 @@ def command_config_ls(args: dict):
     return
 
 
-def command_config_setup(args: dict):
-    setup_logging(args['verbose'])
-    config = utils.parse_config(args)
+def command_config_setup(args_dict: dict):
+    setup_logging(args_dict['verbose'])
+    profile_name = args_dict['profile']
+
+    config = utils.parse_config(args_dict)
     if config is None:
         return
-    config, updated = utils.config_write_overrides(args, config, args['profile'])
+
+    config, updated = utils.config_write_overrides(args_dict, config, profile_name)
+    if config is None:
+        return
 
     if updated:
-        config_file_path = os.path.expanduser(args['config_path'])
+        config_file_path = os.path.expanduser(args_dict['config_path'])
         config_file = Path(config_file_path)
         with open(config_file, 'w') as configfile:
             config.write(configfile)
@@ -188,12 +195,17 @@ def command_config_setup(args: dict):
         logger.error("No parameters to update were given, exiting")
 
 
-def command_config_check(args):
-    setup_logging(args['verbose'])
-    config = utils.parse_config(args)
+def command_config_check(args_dict: dict):
+    setup_logging(args_dict['verbose'])
+    profile_name = args_dict['profile']
+
+    config = utils.parse_config(args_dict)
     if config is None:
         return
-    config, _ = utils.config_write_overrides(args, config, args['profile'])
+
+    config, _ = utils.config_write_overrides(args_dict, config, profile_name)
+    if config is None:
+        return
 
     errors = 0
     for profile in config:
@@ -204,53 +216,50 @@ def command_config_check(args):
         logger.info(f"Found {errors} errors")
 
 
-def command_config_push(args):
-    setup_logging(args['verbose'])
-    profile_name = args['profile']
-    config = utils.parse_config(args)
+def command_config_push(args_dict: dict):
+    setup_logging(args_dict['verbose'])
+    profile_name = args_dict['profile']
+
+    config = utils.parse_config(args_dict)
     if config is None:
         return
-    config, _ = utils.config_write_overrides(args, config, args['profile'])
 
-    table_name = args['remote_table_name']
-    table = dynamodb_resource.Table(table_name)
-
-    status = dynamodb.check_remote_state_table(dynamodb_client, table_name, auto_create=True)
-    if not status:
-        return
-
-    profile_dict = utils.create_envvar_dict(args, config, profile_name)
-
-    status = dynamodb.create_profile(table, profile_name, profile_dict)
-    if not status:
-        return
-
-    logger.info(f"Successfully pushed profile {profile_name} to DynamoDB table {table_name}")
-
-
-def command_config_pull(args):
-    setup_logging(args['verbose'])
-    profile_name = args['profile']
-    config = utils.parse_config(args)
+    config, _ = utils.config_write_overrides(args_dict, config, profile_name)
     if config is None:
         return
-    config, _ = utils.config_write_overrides(args, config, args['profile'])
 
-    table_name = args['remote_table_name']
-    table = dynamodb_resource.Table(table_name)
-
-    status = dynamodb.check_remote_state_table(dynamodb_client, table_name)
+    status = state.check_remote_state_table(auto_create=True)
     if not status:
         return
 
-    profile = dynamodb.fetch_profile(table, profile_name)
+    profile_dict = utils.create_envvar_dict(args_dict, config, profile_name)
 
+    status = state.create_profile(profile_name, profile_dict)
+    if not status:
+        return
+
+    logger.info(f"Successfully pushed profile {profile_name} to DynamoDB table {state.get_table_name()}")
+
+
+def command_config_pull(args_dict):
+    setup_logging(args_dict['verbose'])
+    profile_name = args_dict['profile']
+
+    config = utils.parse_config(args_dict)
+    if config is None:
+        return
+
+    status = state.check_remote_state_table()
+    if not status:
+        return
+
+    profile = state.fetch_profile(profile_name)
     if not profile:
         return
 
     config, updated = utils.config_write_overrides(profile, config, profile_name)
 
-    config_file_path = os.path.expanduser(args['config_path'])
+    config_file_path = os.path.expanduser(args_dict['config_path'])
     config_file = Path(config_file_path)
     with open(config_file, 'w') as configfile:
         config.write(configfile)
@@ -258,63 +267,68 @@ def command_config_pull(args):
     logger.info(f"Successfully pulled profile {profile_name} to local configuration")
 
 
-def command_config_remote_delete(args):
-    setup_logging(args['verbose'])
-    profile_name = args['profile']
-    table_name = args['remote_table_name']
-    table = dynamodb_resource.Table(table_name)
+def command_config_remote_delete(args_dict):
+    setup_logging(args_dict['verbose'])
+    profile_name = args_dict['profile']
 
-    status = dynamodb.check_remote_state_table(dynamodb_client, table_name)
+    status = state.check_remote_state_table()
     if not status:
         return
 
-    status = dynamodb.delete_profile(table, profile_name)
+    status = state.delete_profile(profile_name)
     if not status:
         return
 
-    logger.info(f"Successfully removed profile {profile_name} from DynamoDB table {table_name}")
+    logger.info(f"Successfully removed profile {profile_name} from DynamoDB table {state.get_table_name()}")
 
 
-def command_create(args: dict, name, image_uri):
+def command_create(args: dict):
+    name = args['name']
+    image_uri = args['image_uri']
+
     setup_logging(args['verbose'])
     profile_name = args['profile']
-    table_name = args['remote_table_name']
-    table = dynamodb_resource.Table(table_name)
 
-    status = dynamodb.check_remote_state_table(dynamodb_client, table_name, True)
+    status = state.check_remote_state_table(auto_create=True)
     if not status:
         return
 
     config = utils.parse_config(args)
     if config is None:
         return
-    config, _ = utils.config_write_overrides(args, config, args['profile'])
 
-    variables = utils.create_envvar_dict(args, config, args['profile'])
+    config, _ = utils.config_write_overrides(args, config, profile_name)
+    if config is None:
+        return
+
+    variables = utils.create_envvar_dict(args, config, profile_name)
 
     r = aws_eden_core.methods.create_env(name, image_uri, variables)
-    dynamodb.put_environment(table, profile_name, r['name'], r['cname'])
+    state.put_environment(profile_name, r['name'], r['cname'])
 
 
-def command_delete(args: dict, name):
-    setup_logging(args['verbose'])
-    profile_name = args['profile']
-    table_name = args['remote_table_name']
-    table = dynamodb_resource.Table(table_name)
+def command_delete(args_dict: dict):
+    name = args_dict['name']
 
-    status = dynamodb.check_remote_state_table(dynamodb_client, table_name)
+    setup_logging(args_dict['verbose'])
+    profile_name = args_dict['profile']
+
+    status = state.check_remote_state_table()
     if not status:
         return
 
-    config = utils.parse_config(args)
+    config = utils.parse_config(args_dict)
     if config is None:
         return
-    config, _ = utils.config_write_overrides(args, config, args['profile'])
 
-    variables = utils.create_envvar_dict(args, config, args['profile'])
+    config, _ = utils.config_write_overrides(args_dict, config, profile_name)
+    if config is None:
+        return
+
+    variables = utils.create_envvar_dict(args_dict, config, profile_name)
 
     r = aws_eden_core.methods.delete_env(name, variables)
-    dynamodb.delete_environment(table, profile_name, r['name'])
+    state.delete_environment(profile_name, r['name'])
 
 
 def setup_logging(debug):
@@ -338,19 +352,27 @@ def setup_logging(debug):
 
 
 def main(args=None):
+    global state
+
     if args is None:
         args = sys.argv
+
     parser = create_parser()
     args = parser.parse_args(args=args)
     args_dict = vars(args)
 
     if hasattr(args, 'handler'):
-        if args.handler == command_create:
-            args.handler(args_dict, args.name, args.image_uri)
-        elif args.handler == command_delete:
-            args.handler(args_dict, args.name)
+        # configure state if working with remote commands,
+        # make state inaccessible otherwise
+        if args.handler in handlers_remote:
+            table_name = args.remote_table_name
+            if table_name != consts.DEFAULT_TABLE_NAME:
+                state = dynamodb.DynamoDBState(table_name)
         else:
-            args.handler(args_dict)
+            state = None
+
+        args.handler(args_dict)
+
     else:
         parser.print_help()
         exit(0)
