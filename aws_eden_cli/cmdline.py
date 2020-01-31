@@ -1,5 +1,6 @@
 import argparse
 import datetime
+import json
 import logging
 import os
 import sys
@@ -163,11 +164,13 @@ def command_config_ls(args_dict: dict):
         logger.info("No profiles available")
         return
 
-    for profile in profiles:
-        logger.info(f"Profile {profile['name']}:")
+    for profile_name, profile in profiles.items():
+        logger.info(f"Profile {profile_name}:")
 
-        for parameter in profile['parameters']:
-            logger.info(f"{parameter['name']} {parameter['value=']})")
+        profile_dict = json.loads(profile)
+
+        for k, v in profile_dict.items():
+            logger.info(f"{k} = {v}")
 
         logger.info("")
 

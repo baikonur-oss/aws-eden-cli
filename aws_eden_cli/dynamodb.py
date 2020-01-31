@@ -219,11 +219,10 @@ class DynamoDBState:
                 return None
 
         for item in r['Items']:
-            logger.info(item)
-            profiles += {
-                'name': item['name'],
-                'profile': item['profile'],
-            }
+            name = item['name']
+            profile = item['profile']
+
+            profiles[name] = profile
 
         return profiles
 
