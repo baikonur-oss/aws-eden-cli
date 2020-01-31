@@ -31,6 +31,8 @@ def parse_config(args):
 def config_write_overrides(args, config, profile_name, fail_on_missing_non_default_profile=True):
     updated = False
 
+    logger.warning(args)
+
     if profile_name not in config:
         config[profile_name] = {}
 
@@ -111,5 +113,25 @@ def create_envvar_dict(args, config, profile_name):
             exit(-1)
         else:
             variables[envvar_name] = config[profile_name][parameter_name]
+
+    return variables
+
+
+def dump_profile(args, config, profile_name):
+    variables = {}
+
+    for parameter in consts.parameters:
+        parameter_name = parameter['name']
+
+        if parameter_name in args:
+            if args[parameter_name] is not None:
+                variables[parameter_name] = args[parameter_name]
+                continue
+        if profile_name not in config or parameter_name not in config[profile_name]:
+            logger.error(f"Necessary parameter {parameter_name} not found in profile {profile_name} "
+                         f"and is not provided as an argument")
+            exit(-1)
+        else:
+            variables[parameter_name] = config[profile_name][parameter_name]
 
     return variables

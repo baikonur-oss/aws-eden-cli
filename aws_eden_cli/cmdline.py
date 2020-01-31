@@ -232,7 +232,7 @@ def command_config_push(args_dict: dict):
     if not status:
         return
 
-    profile_dict = utils.create_envvar_dict(args_dict, config, profile_name)
+    profile_dict = utils.dump_profile(args_dict, config, profile_name)
 
     status = state.create_profile(profile_name, profile_dict)
     if not status:
@@ -244,6 +244,8 @@ def command_config_push(args_dict: dict):
 def command_config_pull(args_dict):
     setup_logging(args_dict['verbose'])
     profile_name = args_dict['profile']
+
+    # args_dict['profile'] = 'default'
 
     config = utils.parse_config(args_dict)
     if config is None:
@@ -257,7 +259,8 @@ def command_config_pull(args_dict):
     if not profile:
         return
 
-    config, updated = utils.config_write_overrides(profile, config, profile_name)
+    config, updated = utils.config_write_overrides(profile, config, profile_name,
+                                                   fail_on_missing_non_default_profile=False)
 
     config_file_path = os.path.expanduser(args_dict['config_path'])
     config_file = Path(config_file_path)

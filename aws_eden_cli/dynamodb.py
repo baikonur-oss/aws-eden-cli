@@ -252,7 +252,15 @@ class DynamoDBState:
             logger.warning(f"Profile {profile_name} does not contain any parameters!")
             return None
 
-        return r['Items'][0]['profile']
+        profile = r['Items'][0]['profile']
+
+        try:
+            profile_json = json.loads(profile)
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error: {e}")
+            return None
+
+        return profile_json
 
     def put_environment(self, profile_name, name, cname):
         try:
