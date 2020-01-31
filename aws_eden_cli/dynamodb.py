@@ -187,16 +187,14 @@ class DynamoDBState:
                 return None
 
         for item in r['Items']:
-            key: str = item.pop('env_name')
+            env_type: str = item.pop('type')
+            if env_type == '_profile':
+                continue
 
-            if '$' in key:
-                profile_name, env_name = key.split('$')
+            if env_type not in environments:
+                environments[env_type] = []
 
-                if profile_name not in environments:
-                    environments[profile_name] = []
-
-                item['name'] = env_name
-                environments[profile_name].append(item)
+            environments[env_type].append(item)
 
         return environments
 

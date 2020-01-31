@@ -31,8 +31,6 @@ def parse_config(args):
 def config_write_overrides(args, config, profile_name, fail_on_missing_non_default_profile=True):
     updated = False
 
-    logger.warning(args)
-
     if profile_name not in config:
         config[profile_name] = {}
 

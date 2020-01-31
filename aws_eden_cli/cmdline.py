@@ -241,7 +241,7 @@ def command_config_push(args_dict: dict):
     logger.info(f"Successfully pushed profile {profile_name} to DynamoDB table {state.get_table_name()}")
 
 
-def command_config_pull(args_dict):
+def command_config_pull(args_dict: dict):
     setup_logging(args_dict['verbose'])
     profile_name = args_dict['profile']
 
@@ -270,7 +270,7 @@ def command_config_pull(args_dict):
     logger.info(f"Successfully pulled profile {profile_name} to local configuration")
 
 
-def command_config_remote_delete(args_dict):
+def command_config_remote_delete(args_dict: dict):
     setup_logging(args_dict['verbose'])
     profile_name = args_dict['profile']
 
@@ -285,28 +285,28 @@ def command_config_remote_delete(args_dict):
     logger.info(f"Successfully removed profile {profile_name} from DynamoDB table {state.get_table_name()}")
 
 
-def command_create(args: dict):
-    name = args['name']
-    image_uri = args['image_uri']
+def command_create(args_dict: dict):
+    name = args_dict['name']
+    image_uri = args_dict['image_uri']
 
-    setup_logging(args['verbose'])
-    profile_name = args['profile']
+    setup_logging(args_dict['verbose'])
+    profile_name = args_dict['profile']
 
     status = state.check_remote_state_table(auto_create=True)
     if not status:
         return
 
-    config = utils.parse_config(args)
+    config = utils.parse_config(args_dict)
     if config is None:
         return
 
-    config, _ = utils.config_write_overrides(args, config, profile_name)
+    config, _ = utils.config_write_overrides(args_dict, config, profile_name)
     if config is None:
         return
 
-    variables = utils.create_envvar_dict(args, config, profile_name)
+    profile = utils.dump_profile(args_dict, config, profile_name)
 
-    r = aws_eden_core.methods.create_env(name, image_uri, variables)
+    r = aws_eden_core.methods.create_env(name, image_uri, profile)
     state.put_environment(profile_name, r['name'], r['cname'])
 
 
@@ -328,9 +328,9 @@ def command_delete(args_dict: dict):
     if config is None:
         return
 
-    variables = utils.create_envvar_dict(args_dict, config, profile_name)
+    profile = utils.dump_profile(args_dict, config, profile_name)
 
-    r = aws_eden_core.methods.delete_env(name, variables)
+    r = aws_eden_core.methods.delete_env(name, profile)
     state.delete_environment(profile_name, r['name'])
 
 
