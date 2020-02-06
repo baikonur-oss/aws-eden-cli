@@ -201,7 +201,7 @@ $ eden config push -p api
 Successfully pushed profile api to DynamoDB table eden
 ```
 
-Use remote-rm to remove remote profiles:
+Use remote-rm to delete remote profiles:
 
 ```console
 $ eden config remote-rm -p api
