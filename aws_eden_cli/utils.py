@@ -28,11 +28,15 @@ def parse_config(args):
     return read_config(config_file)
 
 
-def config_write_overrides(args, config, profile_name):
+def config_write_overrides(args, config, profile_name, fail_on_missing_non_default_profile=True):
     updated = False
 
     if profile_name not in config:
         config[profile_name] = {}
+
+        if profile_name != consts.DEFAULT_PROFILE_NAME and fail_on_missing_non_default_profile:
+            logger.error("")
+            return None, None
 
     for parameter in consts.parameters:
         key = parameter['name']
@@ -80,6 +84,13 @@ def check_profile(config, profile):
             logger.error(f"Validation failed for key {key} in profile {profile}")
             errors += 1
             continue
+
+    for k in config[profile]:
+        if k not in consts.parameter_names:
+            logger.error(f"Unknown config key {k} in profile {profile}")
+            errors += 1
+            continue
+
     return errors
 
 
@@ -100,5 +111,25 @@ def create_envvar_dict(args, config, profile_name):
             exit(-1)
         else:
             variables[envvar_name] = config[profile_name][parameter_name]
+
+    return variables
+
+
+def dump_profile(args, config, profile_name):
+    variables = {}
+
+    for parameter in consts.parameters:
+        parameter_name = parameter['name']
+
+        if parameter_name in args:
+            if args[parameter_name] is not None:
+                variables[parameter_name] = args[parameter_name]
+                continue
+        if profile_name not in config or parameter_name not in config[profile_name]:
+            logger.error(f"Necessary parameter {parameter_name} not found in profile {profile_name} "
+                         f"and is not provided as an argument")
+            exit(-1)
+        else:
+            variables[parameter_name] = config[profile_name][parameter_name]
 
     return variables

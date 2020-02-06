@@ -83,14 +83,15 @@ For example, you may want to have API, administration tool and a frontend servic
 $ pip3 install aws-eden-cli 
 
 $ eden -h
-usage: eden [-h] {create,delete,config} ...
+usage: eden [-h] {create,delete,ls,config} ...
 
 ECS Dynamic Environment Manager. Clone Amazon ECS environments easily.
 
 positional arguments:
-  {create,delete,config}
+  {create,delete,ls,config}
     create              Create environment or deploy to existent
     delete              Delete environment
+    ls                  List existing environments
     config              Configure eden
 
 optional arguments:
@@ -108,7 +109,7 @@ positional arguments:
     setup               Setup profiles for other commands
     check               Check configuration file integrity
     push                Push local profile to DynamoDB for use by eden API
-    remote-rm           Remove remote profile from DynamoDB
+    remote-rm           Delete remote profile from DynamoDB
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -133,18 +134,17 @@ Let's create a profile to work with,
 so we won't have to specify all the parameters every time
 
 ```console
-$ eden config setup --config-bucket-key endpoints.json
-$ eden config setup --config-bucket-name servicename-config
-$ eden config setup --config-update-key api_endpoint
-$ eden config setup --config-name-prefix servicename-dev
+$ eden config setup --endpoint-s3-bucket-name servicename-config
+$ eden config setup --endpoint-s3-key endpoints.json
+$ eden config setup --endpoint-name-prefix servicename-dev
+$ eden config setup --endpoint-update-key api_endpoint
+$ eden config setup --endpoint-env-type dev
 $ eden config setup --domain-name-prefix api
 $ eden config setup --dynamic-zone-id Zxxxxxxxxxxxx
-$ eden config setup --dynamic-zone-name dev.example.com.
 $ eden config setup --master-alb-arn arn:aws:elasticloadbalancing:ap-northeast-1:xxxxxxxxxxxx:loadbalancer/app/dev-alb-api-dynamic/xxxxxxxxxx
 $ eden config setup --name-prefix dev-dynamic
 $ eden config setup --reference-service-arn arn:aws:ecs:ap-northeast-1:xxxxxxxxxxxx:service/dev/dev01-api
 $ eden config setup --target-cluster dev
-$ eden config setup --target-container-name api
 ```
 
 Configuration is saved to `~/.eden/config`. 
@@ -168,7 +168,7 @@ config_name_prefix = servicename-dev
 target_container_name = api
 ```
 
-Don't forget to check configuration file integrit
+Don't forget to check configuration file integrity:
 
 ```console
 $ eden config check
@@ -201,7 +201,7 @@ $ eden config push -p api
 Successfully pushed profile api to DynamoDB table eden
 ```
 
-Use remote-rm to remove remote profiles
+Use remote-rm to delete remote profiles:
 
 ```console
 $ eden config remote-rm -p api
@@ -209,6 +209,7 @@ Successfully removed profile api from DynamoDB table eden
 ```
 
 ### Execute commands
+Create an environment:
 ```console
 $ eden create -p api --name foo --image-uri xxxxxxxxxx.dkr.ecr.ap-northeast-1.amazonaws.com/api:latest
 Checking if image xxxxxxxxxx.dkr.ecr.ap-northeast-1.amazonaws.com/api:latest exists
@@ -228,11 +229,17 @@ Updating config file s3://example-com-config/endpoints.json, environment example
 Existing environment not found, adding new
 Successfully updated config file
 Successfully finished creating environment dev-dynamic-api-foo
+```
 
+Check creation:
+```console
 $ eden ls
 Profile api:
 dev-dynamic-api-foo api-foo.dev.example.com (last updated: 2019-11-20T19:44:10.179760)
+```
 
+Delete environment and check deletion:
+```console
 $ eden delete -p api --name foo
 Updating config file s3://example-com-config/endpoints.json, delete environment example-api-foo: nodeDomain -> api-foo.dev.example.com
 Existing environment found, and the only optional key is nodeDomain,deleting environment

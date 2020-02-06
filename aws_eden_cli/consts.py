@@ -1,95 +1,88 @@
 from aws_eden_core import validators
 
+DEFAULT_TABLE_NAME = 'eden'
+DEFAULT_PROFILE_NAME = 'default'
+
 parameters = [
     {
-        'name': 'config_bucket_name',
-        'envvar_name': 'CONFIG_BUCKET',
+        'name': 'endpoint_s3_bucket_name',
+        'envvar_name': 'ENDPOINT_S3_BUCKET_NAME',
         'validator': validators.is_string,
-        'help_string': 'config bucket name',
-        'flag': '--config-bucket-name',
+        'help_string': 'Endpoints file S3 bucket_name',
+        'flag': '--endpoint-s3-bucket-name',
     },
     {
-        'name': 'config_bucket_key',
-        'envvar_name': 'CONFIG_BUCKET_KEY',
+        'name': 'endpoint_s3_key',
+        'envvar_name': 'ENDPOINT_S3_KEY',
         'validator': validators.is_string,
-        'help_string': 'config bucket key',
-        'flag': '--config-bucket-key',
+        'help_string': 'Endpoints file S3 key',
+        'flag': '--endpoint-s3-key',
     },
     {
-        'name': 'config_name_prefix',
-        'envvar_name': 'CONFIG_NAME_PREFIX',
+        'name': 'endpoint_name_prefix',
+        'envvar_name': 'ENDPOINT_NAME_PREFIX',
         'validator': validators.is_string,
-        'help_string': 'config name prefix',
-        'flag': '--config-name-prefix',
+        'help_string': 'Endpoint name prefix',
+        'flag': '--endpoint-name-prefix',
     },
     {
-        'name': 'config_update_key',
-        'envvar_name': 'CONFIG_UPDATE_KEY',
+        'name': 'endpoint_update_key',
+        'envvar_name': 'ENDPOINT_UPDATE_KEY',
         'validator': validators.is_string,
-        'help_string': 'config update key',
-        'flag': '--config-update-key',
+        'help_string': 'Endpoint update key',
+        'flag': '--endpoint-update-key',
     },
     {
-        'name': 'config_env_type',
-        'envvar_name': 'CONFIG_ENV_TYPE',
+        'name': 'endpoint_env_type',
+        'envvar_name': 'ENDPOINT_ENV_TYPE',
         'validator': validators.is_string,
-        'help_string': 'config env type',
-        'flag': '--config-env-type',
+        'help_string': 'Endpoint env type',
+        'flag': '--endpoint-env-type',
     },
     {
         'name': 'domain_name_prefix',
         'envvar_name': 'DOMAIN_NAME_PREFIX',
         'validator': validators.is_string,
-        'help_string': 'domain name prefix',
+        'help_string': 'Endpoint domain name prefix',
         'flag': '--domain-name-prefix',
     },
     {
         'name': 'dynamic_zone_id',
         'envvar_name': 'DYNAMIC_ZONE_ID',
         'validator': validators.is_string,
-        'help_string': 'dynamic zone id',
+        'help_string': 'Dynamic Zone ID',
         'flag': '--dynamic-zone-id',
-    },
-    {
-        'name': 'dynamic_zone_name',
-        'envvar_name': 'DYNAMIC_ZONE_NAME',
-        'validator': validators.is_string,
-        'help_string': 'dynamic zone name',
-        'flag': '--dynamic-zone-name',
     },
     {
         'name': 'name_prefix',
         'envvar_name': 'NAME_PREFIX',
         'validator': validators.is_string,
-        'help_string': 'name prefix',
+        'help_string': 'Resource name prefix',
         'flag': '--name-prefix',
     },
     {
         'name': 'target_cluster',
         'envvar_name': 'TARGET_CLUSTER',
         'validator': validators.is_string,
-        'help_string': 'target cluster',
+        'help_string': 'Target cluster for dynamic environments',
         'flag': '--target-cluster',
-    },
-    {
-        'name': 'target_container_name',
-        'envvar_name': 'TARGET_CONTAINER_NAME',
-        'validator': validators.is_string,
-        'help_string': 'target container name',
-        'flag': '--target-container-name',
     },
     {
         'name': 'master_alb_arn',
         'envvar_name': 'MASTER_ALB_ARN',
         'validator': validators.is_string,
-        'help_string': 'master alb arn',
+        'help_string': 'Master ALB ARN',
         'flag': '--master-alb-arn',
     },
     {
         'name': 'reference_service_arn',
         'envvar_name': 'REFERENCE_SERVICE_ARN',
         'validator': validators.is_string,
-        'help_string': 'reference service arn',
+        'help_string': 'Reference ECS Service ARN',
         'flag': '--reference-service-arn',
     },
 ]
+
+parameter_names = set()
+for p in parameters:
+    parameter_names.add(p['name'])

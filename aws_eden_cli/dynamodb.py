@@ -4,262 +4,292 @@ import logging
 import time
 
 import botocore
+import boto3
 from boto3.dynamodb.conditions import Key
 
 logger = logging.getLogger()
 
 
-def describe_remote_state_table(dynamodb, table_name):
-    response = dynamodb.describe_table(TableName=table_name)
-    table_status = response['Table']['TableStatus']
-    return table_status
+class DynamoDBState:
+    def __init__(self, table_name: str):
+        self.dynamodb_client = boto3.client('dynamodb')
+        self.dynamodb_resource = boto3.resource('dynamodb')
 
+        self.table_name = table_name
+        self.table = self.dynamodb_resource.Table(table_name)
 
-def create_remote_state_table(dynamodb, table_name):
-    try:
-        response = dynamodb.create_table(
-            AttributeDefinitions=[
-                {
-                    'AttributeName': 'type',
-                    'AttributeType': 'S'
-                },
-                {
-                    'AttributeName': 'name',
-                    'AttributeType': 'S'
-                },
-                {
-                    'AttributeName': 'last_updated',
-                    'AttributeType': 'S'
-                }
-            ],
-            TableName=table_name,
-            KeySchema=[
-                {
-                    'AttributeName': 'type',
-                    'KeyType': 'HASH'
-                },
-                {
-                    'AttributeName': 'name',
-                    'KeyType': 'RANGE'
-                },
-            ],
-            GlobalSecondaryIndexes=[
-                {
-                    'IndexName': 'name_last_updated_gsi',
-                    'KeySchema': [
-                        {
-                            'AttributeName': 'name',
-                            'KeyType': 'HASH',
-                        },
-                        {
-                            'AttributeName': 'last_updated',
-                            'KeyType': 'RANGE',
-                        },
-                    ],
-                    'Projection': {
-                        'ProjectionType': 'ALL',
-                    }
-                },
-            ],
-            BillingMode='PAY_PER_REQUEST',
-        )
-        table_status = response['TableDescription']['TableStatus']
+    def get_table_name(self):
+        return self.table_name
+
+    def describe_remote_state_table(self):
+        response = self.dynamodb_client.describe_table(TableName=self.table_name)
+        table_status = response['Table']['TableStatus']
         return table_status
 
-    except Exception as e:
-        if hasattr(e, 'response') and 'Error' in e.response:
-            logger.error(e.response['Error']['Message'])
-            return None
-        else:
-            logger.error(f"Unknown exception raised: {e}")
-            return None
+    def create_remote_state_table(self):
+        try:
+            response = self.dynamodb_client.create_table(
+                AttributeDefinitions=[
+                    {
+                        'AttributeName': 'type',
+                        'AttributeType': 'S'
+                    },
+                    {
+                        'AttributeName': 'name',
+                        'AttributeType': 'S'
+                    },
+                    {
+                        'AttributeName': 'type_name',
+                        'AttributeType': 'S'
+                    },
+                    {
+                        'AttributeName': 'last_updated',
+                        'AttributeType': 'S'
+                    }
+                ],
+                TableName=self.table_name,
+                KeySchema=[
+                    {
+                        'AttributeName': 'type',
+                        'KeyType': 'HASH'
+                    },
+                    {
+                        'AttributeName': 'name',
+                        'KeyType': 'RANGE'
+                    },
+                ],
+                GlobalSecondaryIndexes=[
+                    {
+                        'IndexName': 'type_name_last_updated_gsi',
+                        'KeySchema': [
+                            {
+                                'AttributeName': 'type_name',
+                                'KeyType': 'HASH',
+                            },
+                            {
+                                'AttributeName': 'last_updated',
+                                'KeyType': 'RANGE',
+                            },
+                        ],
+                        'Projection': {
+                            'ProjectionType': 'ALL',
+                        }
+                    },
+                ],
+                BillingMode='PAY_PER_REQUEST',
+            )
+            table_status = response['TableDescription']['TableStatus']
+            return table_status
 
-
-def check_remote_state_table(dynamodb, table_name):
-    try:
-        table_status = describe_remote_state_table(dynamodb, table_name)
-    except botocore.exceptions.NoCredentialsError:
-        logger.error("AWS credentials not found!")
-        return False
-    except Exception as e:
-        if hasattr(e, 'response') and 'Error' in e.response:
-            code = e.response['Error']['Code']
-            if code == 'ResourceNotFoundException':
-                table_status = create_remote_state_table(dynamodb, table_name)
-                if table_status is None:
-                    return False
-            else:
+        except Exception as e:
+            if hasattr(e, 'response') and 'Error' in e.response:
                 logger.error(e.response['Error']['Message'])
+                return None
+            else:
+                logger.error(f"Unknown exception raised: {e}")
+                return None
+
+    def check_remote_state_table(self, auto_create: bool = False):
+        try:
+            table_status = self.describe_remote_state_table()
+        except botocore.exceptions.NoCredentialsError:
+            logger.error("AWS credentials not found!")
+            return False
+        except Exception as e:
+            if hasattr(e, 'response') and 'Error' in e.response:
+                code = e.response['Error']['Code']
+                if code == 'ResourceNotFoundException':
+                    if auto_create:
+                        logger.info(f"Remote state table {self.table_name} does not exist, creating...")
+                        table_status = self.create_remote_state_table()
+                    else:
+                        logger.error(f"Remote state table {self.table_name} does not exist")
+                        return False
+
+                    if table_status is None:
+                        return False
+                else:
+                    logger.error(e.response['Error']['Message'])
+                    return False
+
+            else:
+                logger.error(f"Unknown exception raised: {e}")
                 return False
 
-        else:
-            logger.error(f"Unknown exception raised: {e}")
+        if table_status == 'DELETING':
+            logger.error("Table deletion is in progress, try again later")
             return False
 
-    if table_status == 'DELETING':
-        logger.error("Table deletion is in progress, try again later")
-        return False
-
-    elif table_status == 'UPDATING':
-        logger.error("Table update is in progress, try again later")
-        return False
-
-    elif table_status == 'CREATING':
-        logger.info("Waiting for table creation...")
-        while table_status != 'ACTIVE':
-            time.sleep(0.1)
-            table_status = describe_remote_state_table(dynamodb, table_name)
-
-    return True
-
-
-def delete_profile(table, profile_name):
-    try:
-        table.delete_item(
-            Key={
-                'type': '_profile',
-                'name': profile_name,
-            },
-        )
-    except Exception as e:
-        if hasattr(e, 'response') and 'Error' in e.response:
-            logger.error(e.response['Error']['Message'])
+        elif table_status == 'UPDATING':
+            logger.error("Table update is in progress, try again later")
             return False
-        else:
-            logger.error(f"Unknown exception raised: {e}")
-            return False
-    return True
 
+        elif table_status == 'CREATING':
+            logger.info("Waiting for table creation...")
+            while table_status != 'ACTIVE':
+                time.sleep(0.1)
+                table_status = self.describe_remote_state_table()
 
-def create_profile(table, profile_name, profile_dict):
-    try:
-        table.put_item(
-            Item={
-                'type': '_profile',
-                'name': profile_name,
-                'profile': json.dumps(profile_dict)
-            }
-        )
-    except Exception as e:
-        if hasattr(e, 'response') and 'Error' in e.response:
-            logger.error(e.response['Error']['Message'])
-            return False
-        else:
-            logger.error(f"Unknown exception raised: {e}")
-            return False
-    return True
+        return True
 
+    def delete_profile(self, profile_name):
+        try:
+            self.table.delete_item(
+                Key={
+                    'type': '_profile',
+                    'name': profile_name,
+                },
+            )
+        except Exception as e:
+            if hasattr(e, 'response') and 'Error' in e.response:
+                logger.error(e.response['Error']['Message'])
+                return False
+            else:
+                logger.error(f"Unknown exception raised: {e}")
+                return False
+        return True
 
-def fetch_all_environments(table):
-    environments = {}
+    def create_profile(self, profile_name, profile_dict):
+        try:
+            self.table.put_item(
+                Item={
+                    'type': '_profile',
+                    'name': profile_name,
+                    'type_name': f"_profile_{profile_name}",
+                    'profile': json.dumps(profile_dict)
+                }
+            )
+        except Exception as e:
+            if hasattr(e, 'response') and 'Error' in e.response:
+                logger.error(e.response['Error']['Message'])
+                return False
+            else:
+                logger.error(f"Unknown exception raised: {e}")
+                return False
+        return True
 
-    try:
-        r = table.scan()
-    except Exception as e:
-        if hasattr(e, 'response') and 'Error' in e.response:
-            logger.error(e.response['Error']['Message'])
+    def fetch_all_environments(self):
+        environments = {}
+
+        try:
+            r = self.table.scan()
+        except Exception as e:
+            if hasattr(e, 'response') and 'Error' in e.response:
+                code = e.response['Error']['Code']
+                if code == 'ResourceNotFoundException':
+                    logger.error(f"eden table not found, please create table with "
+                                 f"\"eden config push\" or \"eden create\" first")
+                else:
+                    logger.error(e.response['Error']['Message'])
+                return None
+            else:
+                logger.error(f"Unknown exception raised: {e}")
+                return None
+
+        for item in r['Items']:
+            env_type: str = item.pop('type')
+            if env_type == '_profile':
+                continue
+
+            if env_type not in environments:
+                environments[env_type] = []
+
+            environments[env_type].append(item)
+
+        return environments
+
+    def fetch_all_profiles(self):
+        profiles = {}
+
+        try:
+            r = self.table.query(
+                KeyConditionExpression=Key('type').eq('_profile')
+            )
+        except Exception as e:
+            if hasattr(e, 'response') and 'Error' in e.response:
+                code = e.response['Error']['Code']
+                if code == 'ResourceNotFoundException':
+                    logger.error(f"eden table not found, please create table with "
+                                 f"\"eden config push\" or \"eden create\" first")
+                else:
+                    logger.error(e.response['Error']['Message'])
+                return None
+            else:
+                logger.error(f"Unknown exception raised: {e}")
+                return None
+
+        for item in r['Items']:
+            name = item['name']
+            profile = item['profile']
+
+            profiles[name] = profile
+
+        return profiles
+
+    def fetch_profile(self, profile_name):
+        try:
+            r = self.table.query(
+                KeyConditionExpression=Key('type').eq('_profile') & Key('name').eq(profile_name)
+            )
+        except Exception as e:
+            if hasattr(e, 'response') and 'Error' in e.response:
+                logger.error(e.response['Error']['Message'])
+                return None
+            else:
+                logger.error(f"Unknown exception raised: {e}")
+                return None
+
+        if 'Items' not in r or len(r['Items']) == 0:
+            logger.warning(f"Profile {profile_name} not found in remote table!")
             return None
-        else:
-            logger.error(f"Unknown exception raised: {e}")
+        elif len(r['Items']) != 1:
+            logger.warning(f"Got multiple profiles for profile name {profile_name} from remote table!")
+            return None
+        elif 'profile' not in r['Items'][0]:
+            logger.warning(f"Profile {profile_name} does not contain any parameters!")
             return None
 
-    for item in r['Items']:
-        key: str = item.pop('env_name')
+        profile = r['Items'][0]['profile']
 
-        if '$' in key:
-            profile_name, env_name = key.split('$')
-
-            if profile_name not in environments:
-                environments[profile_name] = []
-
-            item['name'] = env_name
-            environments[profile_name].append(item)
-
-    return environments
-
-
-def fetch_all_profiles(table):
-    profiles = {}
-
-    try:
-        r = table.query(
-            KeyConditionExpression=Key('type').eq('_profile')
-        )
-    except Exception as e:
-        if hasattr(e, 'response') and 'Error' in e.response:
-            logger.error(e.response['Error']['Message'])
-            return None
-        else:
-            logger.error(f"Unknown exception raised: {e}")
+        try:
+            profile_json = json.loads(profile)
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error: {e}")
             return None
 
-    for item in r['Items']:
-        logger.info(item)
-        profiles += {
-            'name': item['name'],
-            'profile': item['profile'],
-        }
+        return profile_json
 
-    return profiles
+    def put_environment(self, profile_name, name, cname):
+        try:
+            return self.table.put_item(
+                Item={
+                    'type': profile_name,
+                    'name': name,
+                    'type_name': f"{type}_{profile_name}",
+                    'last_updated_time': str(datetime.datetime.now().timestamp()),
+                    'endpoint': cname,
+                }
+            )
+        except Exception as e:
+            if hasattr(e, 'response') and 'Error' in e.response:
+                logger.error(e.response['Error']['Message'])
+                return None
+            else:
+                logger.error(f"Unknown exception raised: {e}")
+                return None
 
-
-def fetch_profile(table, profile_name):
-    try:
-        r = table.query(
-            KeyConditionExpression=Key('type').eq('_profile') & Key('name').eq(profile_name)
-        )
-    except Exception as e:
-        if hasattr(e, 'response') and 'Error' in e.response:
-            logger.error(e.response['Error']['Message'])
-            return None
-        else:
-            logger.error(f"Unknown exception raised: {e}")
-            return None
-
-    if 'Items' not in r or len(r['Items']) == 0:
-        logger.warning(f"Profile {profile_name} not found in remote table!")
-        return None
-    elif len(r['Items']) != 1:
-        logger.warning(f"Got multiple profiles for profile name {profile_name} from remote table!")
-        return None
-    elif 'profile' not in r['Items'][0]:
-        logger.warning(f"Profile {profile_name} does not contain any parameters!")
-        return None
-
-    return r['Items'][0]['profile']
-
-
-def put_environment(table, profile_name, name, cname):
-    try:
-        return table.put_item(
-            Item={
-                'type': profile_name,
-                'last_updated_time': str(datetime.datetime.now().timestamp()),
-                'endpoint': cname,
-                'name': name,
-            }
-        )
-    except Exception as e:
-        if hasattr(e, 'response') and 'Error' in e.response:
-            logger.error(e.response['Error']['Message'])
-            return None
-        else:
-            logger.error(f"Unknown exception raised: {e}")
-            return None
-
-
-def delete_environment(table, profile_name, name):
-    try:
-        return table.delete_item(
-            Key={
-                'type': profile_name,
-                'name': name,
-            },
-        )
-    except Exception as e:
-        if hasattr(e, 'response') and 'Error' in e.response:
-            logger.error(e.response['Error']['Message'])
-            return None
-        else:
-            logger.error(f"Unknown exception raised: {e}")
-            return None
+    def delete_environment(self, profile_name, name):
+        try:
+            return self.table.delete_item(
+                Key={
+                    'type': profile_name,
+                    'name': name,
+                },
+            )
+        except Exception as e:
+            if hasattr(e, 'response') and 'Error' in e.response:
+                logger.error(e.response['Error']['Message'])
+                return None
+            else:
+                logger.error(f"Unknown exception raised: {e}")
+                return None
