@@ -248,8 +248,6 @@ def command_config_pull(args_dict: dict):
     setup_logging(args_dict['verbose'])
     profile_name = args_dict['profile']
 
-    # args_dict['profile'] = 'default'
-
     config = utils.parse_config(args_dict)
     if config is None:
         return
