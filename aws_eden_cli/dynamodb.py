@@ -100,7 +100,7 @@ class DynamoDBState:
                 code = e.response['Error']['Code']
                 if code == 'ResourceNotFoundException':
                     if auto_create:
-                        logger.error(f"Remote state table {self.table_name} does not exist, creating...")
+                        logger.info(f"Remote state table {self.table_name} does not exist, creating...")
                         table_status = self.create_remote_state_table()
                     else:
                         logger.error(f"Remote state table {self.table_name} does not exist")
