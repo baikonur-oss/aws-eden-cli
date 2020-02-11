@@ -228,8 +228,11 @@ class DynamoDBState:
 
     def fetch_profile(self, profile_name):
         try:
-            r = self.table.query(
-                KeyConditionExpression=Key('type').eq('_profile') & Key('name').eq(profile_name)
+            r = self.table.get_item(
+                Key={
+                    'type': '_profile',
+                    'name': profile_name,
+                }
             )
         except Exception as e:
             if hasattr(e, 'response') and 'Error' in e.response:
@@ -239,17 +242,14 @@ class DynamoDBState:
                 logger.error(f"Unknown exception raised: {e}")
                 return None
 
-        if 'Items' not in r or len(r['Items']) == 0:
+        if 'Item' not in r:
             logger.warning(f"Profile {profile_name} not found in remote table!")
             return None
-        elif len(r['Items']) != 1:
-            logger.warning(f"Got multiple profiles for profile name {profile_name} from remote table!")
-            return None
-        elif 'profile' not in r['Items'][0]:
+        elif 'profile' not in r['Item']:
             logger.warning(f"Profile {profile_name} does not contain any parameters!")
             return None
 
-        profile = r['Items'][0]['profile']
+        profile = r['Item']['profile']
 
         try:
             profile_json = json.loads(profile)
