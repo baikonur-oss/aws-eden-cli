@@ -265,7 +265,7 @@ class DynamoDBState:
                 Item={
                     'type': profile_name,
                     'name': name,
-                    'type_name': f"{type}_{profile_name}",
+                    'type_name': f"{profile_name}${name}",
                     'last_updated_time': str(datetime.datetime.now().timestamp()),
                     'endpoint': cname,
                 }
