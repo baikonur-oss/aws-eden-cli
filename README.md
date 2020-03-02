@@ -1,8 +1,13 @@
-# aws-eden-cli: ECS Dynamic Environment Manager [![PyPi version](https://img.shields.io/pypi/v/aws-eden-cli.svg)](https://pypi.python.org/pypi/aws-eden-cli/) ![](https://img.shields.io/badge/python-3.6+-blue.svg) ![t](https://img.shields.io/badge/status-beta-orange.svg) 
-
+# aws-eden-cli: ECS Dynamic Environment Manager 
 
 Clone Amazon ECS environments easily. 
 Provide eden with a Amazon ECS service and eden will clone it. 
+
+
+![](https://img.shields.io/badge/python-3.6+-blue.svg) 
+[![PyPi version](https://img.shields.io/pypi/v/aws-eden-cli.svg)](https://pypi.python.org/pypi/aws-eden-cli/) 
+![t](https://img.shields.io/badge/status-beta-orange.svg) 
+[![Language grade: Python](https://img.shields.io/lgtm/grade/python/g/baikonur-oss/aws-eden-cli.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/baikonur-oss/aws-eden-cli/context:python)
 
 eden is provided in CLI and Terraform module (Lambda with HTTP API) flavors. 
 You can use HTTP API from CI of your choice on Pull Request open/close, 
