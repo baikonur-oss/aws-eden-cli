@@ -1,4 +1,5 @@
 import datetime
+import decimal
 import json
 import logging
 import time
@@ -39,12 +40,12 @@ class DynamoDBState:
                         'AttributeType': 'S'
                     },
                     {
-                        'AttributeName': 'type_name',
+                        'AttributeName': 'kind',
                         'AttributeType': 'S'
                     },
                     {
                         'AttributeName': 'last_updated',
-                        'AttributeType': 'S'
+                        'AttributeType': 'N'
                     }
                 ],
                 TableName=self.table_name,
@@ -60,10 +61,10 @@ class DynamoDBState:
                 ],
                 GlobalSecondaryIndexes=[
                     {
-                        'IndexName': 'type_name_last_updated_gsi',
+                        'IndexName': 'kind_last_updated_gsi',
                         'KeySchema': [
                             {
-                                'AttributeName': 'type_name',
+                                'AttributeName': 'kind',
                                 'KeyType': 'HASH',
                             },
                             {
@@ -149,14 +150,14 @@ class DynamoDBState:
                 return False
         return True
 
-    def create_profile(self, profile_name, profile_dict):
+    def put_profile(self, profile_name, profile_dict):
         try:
             self.table.put_item(
                 Item={
                     'type': '_profile',
                     'name': profile_name,
-                    'type_name': f"_profile_{profile_name}",
-                    'profile': json.dumps(profile_dict)
+                    'profile': json.dumps(profile_dict),
+                    'kind': 'profile'
                 }
             )
         except Exception as e:
@@ -265,9 +266,9 @@ class DynamoDBState:
                 Item={
                     'type': profile_name,
                     'name': name,
-                    'type_name': f"{profile_name}${name}",
-                    'last_updated_time': str(datetime.datetime.now().timestamp()),
+                    'last_updated': decimal.Decimal(datetime.datetime.now().timestamp()),
                     'endpoint': cname,
+                    'kind': 'environment',
                 }
             )
         except Exception as e:

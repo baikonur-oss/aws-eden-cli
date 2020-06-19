@@ -237,7 +237,7 @@ def command_config_push(args_dict: dict):
 
     profile_dict = utils.dump_profile(args_dict, config, profile_name)
 
-    status = state.create_profile(profile_name, profile_dict)
+    status = state.put_profile(profile_name, profile_dict)
     if not status:
         return
 
